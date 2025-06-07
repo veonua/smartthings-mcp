@@ -1,0 +1,35 @@
+[project]
+name = "mcp-smartthings"
+version = "0.1.0"
+description = "A Model Context Protocol server providing tools for Smartthings integration."
+readme = "README.md"
+requires-python = ">=3.12"
+
+authors = [
+    { name = "Andrew 'veon' Matuk", email = "andrew.i.matiuk@gmail.com" },
+]
+
+keywords = ["mcp", "llm", "home automation", "smartthings"]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "mcp[cli]>=1.9.2",
+    "pandas>=2.2.3",
+    "pydantic>=2.0.0",
+    "requests>=2.32.3",
+    "tenacity>=9.1.2",
+    "tzdata>=2024.2",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pyright>=1.1.389",
+    "pytest>=8.3.3",
+    "ruff>=0.8.1",
+]
