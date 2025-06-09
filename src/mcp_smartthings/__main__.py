@@ -2,4 +2,5 @@ import sys
 
 from .server import main
 
-sys.exit(main())  # type: ignore[call-arg]
+if __name__ == "__main__":
+    sys.exit(main())
