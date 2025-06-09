@@ -166,7 +166,7 @@ class Location(ILocation):
     def _get_devices(self, url: str):
         try:
             return requests.request("GET", url, headers=self.headers).json()['items']
-        except Exception as e:
+        except Exception:
             print(url)
             raise
 
@@ -292,45 +292,3 @@ class Location(ILocation):
         capabilities_df = pd.DataFrame(c, columns=['deviceId', 'component', 'capability', 'attribute', 'value', 'unit',
                                                    'timestamp'])
         return devices_df, capabilities_df
-
-# device_status = _device_status(device_id=devices['deviceId'][42])
-
-# for (k,v) in device_status.items():
-#     print(k)
-#     for (k2,v2) in v.items():
-
-#         dd = {"thermostatHeatingSetpoint": "heatingSetpoint",
-#               "temperatureMeasurement": "temperature",
-#               "thermostatCoolingSetpoint": "coolingSetpoint",
-#               "switchLevel": "level",
-#               "voltageMeasurement": "voltage",
-#               "powerMeter": "power",
-#               "energyMeter": "energy",
-#               "contactSensor": "contact",
-#               "motionSensor": "motion",
-#               "signalStrength": 'rssi',
-#               "windowShadeLevel": 'shadeLevel',
-#               "winterdictionary35590.cube": 'face',
-#               "audioVolume": 'volume',
-#               "audioMute": 'mute',
-#               "relativeHumidityMeasurement": 'humidity',
-#               "atmosphericPressureMeasurement": 'atmosphericPressure',
-#               "waterSensor": 'water',
-#               "presenceSensor": 'presence',
-#               'dishwasherOperatingState': 'machineState',
-#               }        
-
-#         if k2 in dd:
-#             k2 = dd[k2]
-#             v3 = v2[k2]
-
-#         else:
-#             v3 = v2.get(k2)
-#             if v3 is None:
-#                 if v2 != {}:
-#                     print(f"\t--{k2}: {v2}")
-#                 continue
-#         value = v3.get('value')
-#         units = v3.get('unit', '')
-#         timestamp = v3.get('timestamp')
-#         print(f"\t{k2}:\t{value}{units}\t{timestamp}")
