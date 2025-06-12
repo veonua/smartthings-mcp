@@ -289,3 +289,14 @@ class Location(ILocation):
         capabilities_df = pd.DataFrame(c, columns=['deviceId', 'component', 'capability', 'attribute', 'value', 'unit',
                                                    'timestamp'])
         return devices_df, capabilities_df
+
+    @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
+    def _device_commands(self, device_id: UUID | str, commands: list[dict]) -> dict:
+        """Low level API call to execute commands on a device."""
+        url = f"{BASE_URL}v1/devices/{device_id}/commands"
+        payload = {"commands": commands}
+        return self.session.post(url, json=payload).json()
+
+    def device_commands(self, device_id: UUID | str, commands: list[dict]) -> dict:
+        """Execute SmartThings commands on a device."""
+        return self._device_commands(device_id, commands)

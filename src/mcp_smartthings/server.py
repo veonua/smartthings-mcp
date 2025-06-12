@@ -47,6 +47,12 @@ def get_device_status(device_id: UUID):
     return location._device_status(device_id)
 
 
+@mcp.tool(description="Execute commands on a device")
+def execute_commands(device_id: UUID, commands: List[dict]):
+    """Send SmartThings commands to a device."""
+    return location.device_commands(device_id, commands)
+
+
 if __name__ == "__main__":
     """Run the FastMCP server."""
     mcp.run()
