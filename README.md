@@ -36,3 +36,4 @@ The server exposes the following MCP tools:
 - `get_rooms` – return a mapping of room UUIDs to names.
 - `get_devices` – list devices with optional filtering.
 - `get_device_status` – fetch status for a device by UUID.
+- `execute_commands` – send commands to a device.

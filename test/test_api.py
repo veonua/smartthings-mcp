@@ -61,7 +61,7 @@ def test_get_devices_url(monkeypatch):
         "&category=Light"
         "&capabilitiesMode=or"
         "&includeRestricted=true"
-        "&roomId=r1"
+        f"&roomId={room1Id}"
         "&includeStatus=true"
         "&type=LAN"
     )
@@ -75,3 +75,23 @@ def test_get_devices_invalid(monkeypatch):
         loc.get_devices(capability="unknown")
     with pytest.raises(ValueError):
         loc.get_devices(room_id=noRoomId)
+
+
+def test_device_commands(monkeypatch):
+    loc = _make_location()
+
+    captured = {}
+
+    def fake_post(device_id, commands):
+        captured["device_id"] = device_id
+        captured["commands"] = commands
+        return {"status": "ok"}
+
+    loc._device_commands = fake_post
+
+    cmds = [{"component": "main", "capability": "switch", "command": "on", "arguments": []}]
+    res = loc.device_commands("dev1", cmds)
+
+    assert res == {"status": "ok"}
+    assert captured["device_id"] == "dev1"
+    assert captured["commands"] == cmds

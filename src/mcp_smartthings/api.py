@@ -4,6 +4,7 @@ from typing import List, Literal, Tuple
 from uuid import UUID
 
 import pandas as pd
+from pydantic import BaseModel
 import requests
 from tenacity import retry, wait_random_exponential, stop_after_attempt
 
@@ -31,6 +32,20 @@ ComponentCategory = Literal[
     'PresenceSensor', 'RemoteController', 'SmartLock', 'SmokeDetector',
     'Switch', 'Television', 'Thermostat']
 
+
+class Command(BaseModel):
+    component: str
+    capability: Capability
+    command: str
+    arguments: list | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "component": self.component,
+            "capability": self.capability,
+            "command": self.command,
+            "arguments": self.arguments or []
+        }
 
 class ILocation: 
     def device_status(self, device_id: str) -> pd.DataFrame: 
@@ -148,7 +163,7 @@ class Location(ILocation):
     def rooms(self) -> dict[UUID, str]:
         res = {}
         for r in self._rooms()['items']:
-            res[r['roomId']] = r['name']
+            res[UUID(r['roomId'])] = r['name']
 
         return res
 
@@ -195,6 +210,8 @@ class Location(ILocation):
         if include_restricted:
             url += "&includeRestricted=true"
         if room_id is not None:
+            if not isinstance(room_id, UUID):
+                room_id = UUID(room_id)
             if room_id not in self.rooms:
                 raise ValueError(f"roomId '{room_id}' is unknown, must be one of {self.rooms.keys()}")
             url += f"&roomId={room_id}"
@@ -284,8 +301,33 @@ class Location(ILocation):
         devices_df = pd.DataFrame(d, columns=['deviceId', 'category', 'name', 'roomId', 'createTime', 'parentDeviceId',
                                               'type'])  # .set_index('deviceId')
         rooms = self.rooms
-        devices_df['room'] = devices_df['roomId'].map(lambda x: rooms.get(x, x))
+        devices_df['room'] = devices_df['roomId'].map(lambda x: rooms.get(x, str(x)))
         devices_df.drop(columns=['roomId'], inplace=True)
         capabilities_df = pd.DataFrame(c, columns=['deviceId', 'component', 'capability', 'attribute', 'value', 'unit',
                                                    'timestamp'])
         return devices_df, capabilities_df
+
+    @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
+    def _device_commands(self, device_id: UUID, commands: list[Command]) -> dict:
+        """Low level API call to execute commands on a device.
+        {
+          "results": [
+            {
+              "id": "36346e98-539c-4a22-9340-4e877a184a06",
+              "status": "ACCEPTED"
+            }
+          ]
+        }
+        """
+        url = f"{BASE_URL}v1/devices/{device_id}/commands"
+        payload = {"commands": [cmd.to_dict() for cmd in commands]}
+        response = self.session.post(url, json=payload)
+        try:
+            return response.json()
+        except requests.exceptions.JSONDecodeError:
+            logger.error(f"Failed to decode JSON from response: {response.text}")
+            return {"error": "Failed to decode response", "status": response.status_code, "text": response.text}
+
+    def device_commands(self, device_id: UUID, commands: list[Command]) -> dict:
+        """Execute SmartThings commands on a device."""
+        return self._device_commands(device_id, commands)
