@@ -1,5 +1,5 @@
 import logging
-from functools import cached_property, lru_cache
+from functools import cached_property
 from typing import List, Literal, Tuple
 from uuid import UUID
 
@@ -41,9 +41,11 @@ class ILocation:
                       paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> pd.DataFrame:
         pass
 
-    def rooms_df(self) -> pd.DataFrame:
+    @cached_property
+    def rooms(self) -> dict[UUID, str]:
+        """Get rooms UUID and names."""
         pass
-
+   
     def get_room_name(self, room_id: UUID) -> str:
         pass
 
@@ -61,19 +63,20 @@ class ILocation:
                           connection_type: ConnectionType | None = None):
         pass
 
-    def devices_df(self) -> pd.DataFrame:
-       pass
-
+    
 
 class Location(ILocation):
-    headers = {
-        'Accept': 'application/vnd.smartthings+json;v=20170916',
-        # 'cache-control': "no-cache",
-    }
-
+    session : requests.Session
+    
     def __init__(self, auth: str, location_id: UUID | None = None):
-        self.headers['Authorization'] = "Bearer " + auth
-        locations = requests.request("GET", BASE_URL + "v1/locations", headers=self.headers).json()
+        self.session = requests.Session()
+        self.session.headers = {
+            'Accept': 'application/vnd.smartthings+json;v=20170916',
+            'Authorization': "Bearer " + auth,
+            # 'cache-control': "no-cache",
+        }
+
+        locations = self.session.get(BASE_URL + "v1/locations").json()
 
         self.location_id = location_id or locations['items'][0]['locationId']
         self.location = self._location()
@@ -85,11 +88,11 @@ class Location(ILocation):
 
     @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _location(self):
-        return requests.request("GET", f"{BASE_URL}v1/locations/{self.location_id}", headers=self.headers).json()
+        return self.session.get(f"{BASE_URL}v1/locations/{self.location_id}").json()
 
     @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _device_status(self, device_id: UUID | str) -> dict:
-        return requests.request("GET", f"{BASE_URL}devices/{device_id}/status", headers=self.headers).json()[
+        return self.session.get(f"{BASE_URL}devices/{device_id}/status").json()[
             'components']
 
     def device_status(self, device_id: UUID | str) -> pd.DataFrame:
@@ -122,9 +125,7 @@ class Location(ILocation):
         if device_id is not None:
             url += f"&deviceId={device_id}"
 
-        print(url)
-
-        return requests.request("GET", url, headers=self.headers).json()
+        return self.session.get(url).json()
 
     def event_history(self, device_id: str | None = None, limit: int = 500,
                       oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
@@ -136,19 +137,12 @@ class Location(ILocation):
             columns=['deviceName', 'componentLabel', 'text', 'epoch', 'data', 'translatedAttributeName',
                      'translatedAttributeValue', 'locationId', 'locationName', 'hash'])
 
-        # replace "" with None
         df['unit'] = df['unit'].map(lambda x: None if x == "" else x)
         return df
 
     @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _rooms(self):
-        return requests.request("GET", f"{BASE_URL}v1/locations/{self.location_id}/rooms", headers=self.headers).json()
-
-    @lru_cache()
-    def rooms_df(self) -> pd.DataFrame:
-        rooms = self._rooms()['items']
-        df = pd.DataFrame(rooms)
-        return df[['roomId', 'name']]  # .set_index('roomId')
+        return self.session.get(f"{BASE_URL}v1/locations/{self.location_id}/rooms").json()
 
     @cached_property
     def rooms(self) -> dict[UUID, str]:
@@ -158,14 +152,17 @@ class Location(ILocation):
 
         return res
 
-    def get_room_name(self, room_id: UUID):
-        return self.rooms_df().set_index('roomId').loc[str(room_id), 'name']
+    def get_room_name(self, room_id: UUID) -> str:
+        """Get room name by UUID."""
+        if room_id not in self.rooms:
+            raise ValueError(f"roomId '{room_id}' is unknown, must be one of {self.rooms.keys()}")
+        return self.rooms[room_id]
 
     ###
     @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _get_devices(self, url: str):
         try:
-            return requests.request("GET", url, headers=self.headers).json()['items']
+            return self.session.get(url).json()['items']
         except Exception:
             print(url)
             raise
@@ -264,7 +261,7 @@ class Location(ILocation):
         return filtered_devices
 
     @staticmethod
-    def get_status(status: dict):
+    def get_status(status: dict| None):
         if status is None or status == {}:
             return "?", None, None, None
 

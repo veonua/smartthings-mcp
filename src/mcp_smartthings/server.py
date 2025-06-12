@@ -3,8 +3,9 @@ from typing import List
 from uuid import UUID
 
 from mcp.server.fastmcp import FastMCP
+from dotenv import load_dotenv
 
-from .api import (
+from api import (
     CapabilitiesMode,
     Capability,
     ComponentCategory,
@@ -12,7 +13,11 @@ from .api import (
     Location,
 )
 
-location = Location(environ.get("TOKEN"))
+load_dotenv()
+token = environ.get("TOKEN")
+if token is None:
+    raise ValueError("TOKEN environment variable must be set")
+location = Location(token)
 
 # Create server
 mcp = FastMCP("SmartThings")
@@ -42,10 +47,7 @@ def get_device_status(device_id: UUID):
     return location._device_status(device_id)
 
 
-def main() -> None:
+if __name__ == "__main__":
     """Run the FastMCP server."""
     mcp.run()
 
-
-if __name__ == "__main__":
-    main()

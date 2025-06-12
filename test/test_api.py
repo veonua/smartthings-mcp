@@ -1,5 +1,6 @@
 import os
 import sys
+import uuid
 
 import pytest
 
@@ -7,12 +8,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from mcp_smartthings.api import Location, BASE_URL
 
+noRoomId = uuid.UUID("00000000-0000-0000-0000-000000000000")
+room1Id = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 def _make_location():
     loc = object.__new__(Location)
-    loc.headers = {}
     loc.location_id = "loc1"
-    loc.rooms = {"r1": "Room 1"}
+    loc.rooms = {room1Id: "Room 1"}
     return loc
 
 
@@ -28,12 +30,6 @@ def test_get_status_valid():
     }
     assert Location.get_status(status) == ("temperature", 20, "C", "t")
 
-
-def test_rooms_df(monkeypatch):
-    loc = _make_location()
-    loc._rooms = lambda: {"items": [{"roomId": "r1", "name": "Room 1"}]}
-    df = loc.rooms_df()
-    assert df.to_dict(orient="records") == [{"roomId": "r1", "name": "Room 1"}]
 
 
 def test_get_devices_url(monkeypatch):
@@ -51,7 +47,7 @@ def test_get_devices_url(monkeypatch):
         capability="motionSensor",
         capabilities_mode="or",
         include_restricted=True,
-        room_id="r1",
+        room_id=room1Id,
         include_health=False,
         include_status=True,
         category="Light",
@@ -78,4 +74,4 @@ def test_get_devices_invalid(monkeypatch):
     with pytest.raises(ValueError):
         loc.get_devices(capability="unknown")
     with pytest.raises(ValueError):
-        loc.get_devices(room_id="bad")
+        loc.get_devices(room_id=noRoomId)

@@ -2,19 +2,20 @@
 
 This project provides a small [Model Context Protocol](https://github.com/smartthings/mcp) server exposing a few SmartThings helper tools.
 
-## Installing dependencies
-
-Use [uv](https://github.com/astral-sh/uv) to install the dependencies declared in `pyproject.toml` and `uv.lock`:
-
-```bash
-uv pip install --system --verbose
-```
-
-To run the tests:
-
-```bash
-uv pip install --system --dev --verbose
-pytest -q
+```json
+"mcpServers": {
+  "SmartThings": {
+    "type": "stdio",
+    "command": "uv",
+    "args": [
+        "run",
+        "src/mcp_smartthings/server.py"
+    ],
+    "env": {
+        "TOKEN": "Your Personal Token"
+    }
+  }
+}
 ```
 
 ## Docker

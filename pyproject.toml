@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 authors = [
-    { name = "Andrew 'veon' Matuk", email = "andrew.i.matiuk@gmail.com" },
+    { name = "Andrew 'Veon' Matuk", email = "andrew.i.matiuk@gmail.com" },
 ]
 
 keywords = ["mcp", "llm", "home automation", "smartthings"]
