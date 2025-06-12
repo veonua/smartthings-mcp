@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from api import (
     CapabilitiesMode,
     Capability,
+    Command,
     ComponentCategory,
     ConnectionType,
     Location,
@@ -48,8 +49,12 @@ def get_device_status(device_id: UUID):
 
 
 @mcp.tool(description="Execute commands on a device")
-def execute_commands(device_id: UUID, commands: List[dict]):
-    """Send SmartThings commands to a device."""
+def execute_commands(device_id: UUID, commands: List[Command]):
+    """Send SmartThings commands to a device.
+    Hints:
+        first component of a device is usually 'main', but there might be 2-3 switches.
+
+    """
     return location.device_commands(device_id, commands)
 
 
