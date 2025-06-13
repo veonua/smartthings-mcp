@@ -1,8 +1,10 @@
 import os
 import pytest
+import dotenv
 
 from mcp_smartthings.api import Location
 
+dotenv.load_dotenv()
 TOKEN = os.getenv("TOKEN")
 
 pytestmark = pytest.mark.skipif(TOKEN is None, reason="TOKEN environment variable not set")
