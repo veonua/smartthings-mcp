@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from mcp_smartthings.api import Location, BASE_URL
+from mcp_smartthings.api import Command, Location, BASE_URL
 
 noRoomId = uuid.UUID("00000000-0000-0000-0000-000000000000")
 room1Id = uuid.UUID("00000000-0000-0000-0000-000000000001")
@@ -92,7 +92,7 @@ def test_device_commands(monkeypatch):
 
     loc._device_commands = fake_post
 
-    cmds = [{"component": "main", "capability": "switch", "command": "on", "arguments": []}]
+    cmds = [Command(component="main", capability="switch", command="on", arguments=[])]
     res = loc.device_commands(valid, cmds)
 
     assert res == {"status": "ok"}
@@ -105,7 +105,7 @@ def test_validate_device_id():
     valid = uuid.UUID("11111111-1111-1111-1111-111111111111")
     loc.device_ids = {valid}
 
-    assert loc.validate_device_id(str(valid)) == valid
+    assert loc.validate_device_id(valid) == valid
 
     with pytest.raises(ValueError):
         loc.validate_device_id("not-a-uuid")

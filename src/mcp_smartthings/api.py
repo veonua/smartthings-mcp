@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.smartthings.com/"
 
-IGNORE_CAPABILITIES = {'mediaPresets', 'firmwareUpdate', 'healthCheck' 'threeAxis', 'momentary', 'refresh',
+IGNORE_CAPABILITIES = {'mediaPresets', 'firmwareUpdate', 'healthCheck', 'threeAxis', 'momentary', 'refresh',
                        'windowShadePreset', 'configuration', 'bridge', 'alarm', 'statelessPowerToggleButton'}
 
 Capability = Literal['button', 'motionSensor', 'dustSensor', 'carbonDioxideMeasurement',
@@ -48,7 +48,7 @@ class Command(BaseModel):
         }
 
 class ILocation: 
-    def device_status(self, device_id: str) -> pd.DataFrame: 
+    def device_status(self, device_id: UUID) -> pd.DataFrame: 
         pass
 
     def event_history(self, device_id: str | None = None, limit: int = 500,
@@ -106,18 +106,18 @@ class Location(ILocation):
         return self.session.get(f"{BASE_URL}v1/locations/{self.location_id}").json()
 
     @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
-    def _device_status(self, device_id: UUID | str) -> dict:
+    def _device_status(self, device_id: UUID) -> dict:
         return self.session.get(f"{BASE_URL}devices/{device_id}/status").json()[
             'components']
 
-    def device_status(self, device_id: UUID | str) -> pd.DataFrame:
+    def device_status(self, device_id: UUID) -> pd.DataFrame:
         device_id = self.validate_device_id(device_id)
         status = self._device_status(device_id)
         df = pd.DataFrame(status)
         return df
 
     @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
-    def _event_history(self, limit: int | None = None, device_id: UUID | str | None = None,
+    def _event_history(self, limit: int | None = None, device_id: UUID | None = None,
                        oldest_first: bool = False,
                        paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
                        paging_before_epoch: int | None = None, paging_before_hash: int | None = None):
@@ -174,11 +174,11 @@ class Location(ILocation):
         devices = self.get_devices_short(include_health=False, include_status=False)
         return {UUID(d['deviceId']) for d in devices}
 
-    def validate_device_id(self, device_id: UUID | str) -> UUID:
+    def validate_device_id(self, device_id: UUID) -> UUID:
         """Validate that a device ID exists in the location.
 
         Args:
-            device_id: Device UUID or string representation.
+            device_id: Device UUID.
 
         Returns:
             Normalised UUID if valid.
@@ -186,17 +186,15 @@ class Location(ILocation):
         Raises:
             ValueError: If the ID format is invalid or not known.
         """
-        try:
-            device_uuid = UUID(str(device_id))
-        except (ValueError, AttributeError):
+        if not isinstance(device_id, UUID):
             raise ValueError(f"'{device_id}' is not a valid UUID") from None
 
-        if device_uuid not in self.device_ids:
+        if device_id not in self.device_ids:
             raise ValueError(
-                f"deviceId '{device_uuid}' is unknown, use get_devices to list valid ids"
+                f"deviceId '{device_id}' is unknown, use get_devices to list valid ids"
             )
 
-        return device_uuid
+        return device_id
 
     def get_room_name(self, room_id: UUID) -> str:
         """Get room name by UUID."""
