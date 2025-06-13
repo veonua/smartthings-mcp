@@ -1,6 +1,7 @@
 from os import environ
 from typing import List
 from uuid import UUID
+import logging 
 
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
@@ -20,8 +21,14 @@ if token is None:
     raise ValueError("TOKEN environment variable must be set")
 location = Location(token)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 # Create server
-mcp = FastMCP("SmartThings")
+mcp = FastMCP("SmartThings", port=8001)
 
 
 @mcp.tool(description="Get rooms UUID and names")
@@ -40,13 +47,14 @@ def get_devices(
     category: ComponentCategory | None = None,
     connection_type: ConnectionType | None = None,
 ):
+    """Get devices in the location"""
     return location.get_devices_short(**locals())
 
 
 @mcp.tool(description="Get device status")
 def get_device_status(device_id: UUID):
-    device_id = location.validate_device_id(device_id)
-    return location._device_status(device_id)
+    logger.info(f"Getting status for device {device_id}")
+    return location.device_status(device_id)
 
 
 @mcp.tool(description="Execute commands on a device")
@@ -56,7 +64,7 @@ def execute_commands(device_id: UUID, commands: List[Command]):
         first component of a device is usually 'main', but there might be 2-3 switches.
 
     """
-    device_id = location.validate_device_id(device_id)
+    logger.info(f"Executing commands on device {device_id}: {commands}")
     return location.device_commands(device_id, commands)
 
 

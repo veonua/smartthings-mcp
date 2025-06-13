@@ -5,8 +5,8 @@ from uuid import UUID
 
 import pandas as pd
 from pydantic import BaseModel
-import requests
-from tenacity import retry, wait_random_exponential, stop_after_attempt
+
+from custom_session import CustomSession
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +41,14 @@ class Command(BaseModel):
 
     def to_dict(self) -> dict:
         return {
-            "component": self.component,
+            "component": self.component or "main",
             "capability": self.capability,
             "command": self.command,
             "arguments": self.arguments or []
         }
 
 class ILocation: 
-    def device_status(self, device_id: UUID) -> pd.DataFrame: 
+    def device_status(self, device_id: UUID) -> dict: 
         pass
 
     def event_history(self, device_id: str | None = None, limit: int = 500,
@@ -81,18 +81,18 @@ class ILocation:
     
 
 class Location(ILocation):
-    session : requests.Session
+    session : CustomSession
     
     def __init__(self, auth: str, location_id: UUID | None = None):
-        self.session = requests.Session()
+        self.session = CustomSession(BASE_URL, auth=auth)
         self.session.headers = {
             'Accept': 'application/vnd.smartthings+json;v=20170916',
             'Authorization': "Bearer " + auth,
             # 'cache-control': "no-cache",
         }
 
-        locations = self.session.get(BASE_URL + "v1/locations").json()
-
+        locations = self.session.get_json("v1/locations")
+    
         self.location_id = location_id or locations['items'][0]['locationId']
         self.location = self._location()
 
@@ -101,22 +101,17 @@ class Location(ILocation):
         self.timezone = pytz.timezone(self.location['timeZoneId'])
         # self.timeZoneOffset = datetime.datetime.now(timezone).strftime('%z')
 
-    @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _location(self):
-        return self.session.get(f"{BASE_URL}v1/locations/{self.location_id}").json()
+        return self.session.get_json(f"v1/locations/{self.location_id}")
 
-    @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _device_status(self, device_id: UUID) -> dict:
-        return self.session.get(f"{BASE_URL}devices/{device_id}/status").json()[
-            'components']
+        return self.session.get_json(f"devices/{device_id}/status")['components']
 
-    def device_status(self, device_id: UUID) -> pd.DataFrame:
+    def device_status(self, device_id: UUID) -> dict:
         device_id = self.validate_device_id(device_id)
         status = self._device_status(device_id)
-        df = pd.DataFrame(status)
-        return df
+        return status
 
-    @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _event_history(self, limit: int | None = None, device_id: UUID | None = None,
                        oldest_first: bool = False,
                        paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
@@ -126,7 +121,7 @@ class Location(ILocation):
         if limit is None:
             limit = 500
 
-        url = f"{BASE_URL}v1/history/devices?locationId={hub_id}&limit={limit}"
+        url = f"v1/history/devices?locationId={hub_id}&limit={limit}"
 
         if paging_after_epoch is not None:
             url += f"&pagingAfterEpoch={paging_after_epoch}"
@@ -156,9 +151,8 @@ class Location(ILocation):
         df['unit'] = df['unit'].map(lambda x: None if x == "" else x)
         return df
 
-    @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _rooms(self):
-        return self.session.get(f"{BASE_URL}v1/locations/{self.location_id}/rooms").json()
+        return self.session.get_json(f"v1/locations/{self.location_id}/rooms")
 
     @cached_property
     def rooms(self) -> dict[UUID, str]:
@@ -203,20 +197,15 @@ class Location(ILocation):
         return self.rooms[room_id]
 
     ###
-    @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _get_devices(self, url: str):
-        try:
-            return self.session.get(url).json()['items']
-        except Exception:
-            print(url)
-            raise
-
+        return self.session.get_json(url)['items']
+                
     def get_devices(self, capability: List[Capability] | Capability | None = None, capabilities_mode: CapabilitiesMode | None = None,
                     include_restricted: bool = False,
                     room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                     category: ComponentCategory | None = None,
                     connection_type: ConnectionType | None = None):
-        url = f"{BASE_URL}devices?locationId={self.location_id}"
+        url = f"devices?locationId={self.location_id}"
         if capability is not None:
             if isinstance(capability, str):
                 capability = [capability]
@@ -297,8 +286,11 @@ class Location(ILocation):
                                 filtered_capability['status'][k]['timestamp'] = v.get('timestamp')
                     filtered_component['capabilities'].append(filtered_capability)
                 filtered_device['components'].append(filtered_component)
-            filtered_device['createTime'] = device['createTime']
-            filtered_device['healthState'] = device['healthState']
+            
+            #filtered_device['createTime'] = device['createTime']
+            if 'healthState' in device:
+                filtered_device['healthState'] = device['healthState']
+
             if device.get('parentDeviceId') is not None:
                 filtered_device['parentDeviceId'] = device['parentDeviceId']
             filtered_device['type'] = device['type']
@@ -336,7 +328,6 @@ class Location(ILocation):
                                                    'timestamp'])
         return devices_df, capabilities_df
 
-    @retry(wait=wait_random_exponential(2), stop=stop_after_attempt(5))
     def _device_commands(self, device_id: UUID, commands: list[Command]) -> dict:
         """Low level API call to execute commands on a device.
         {
@@ -348,15 +339,10 @@ class Location(ILocation):
           ]
         }
         """
-        url = f"{BASE_URL}v1/devices/{device_id}/commands"
+        url = f"v1/devices/{device_id}/commands"
         payload = {"commands": [cmd.to_dict() for cmd in commands]}
-        response = self.session.post(url, json=payload)
-        try:
-            return response.json()
-        except requests.exceptions.JSONDecodeError:
-            logger.error(f"Failed to decode JSON from response: {response.text}")
-            return {"error": "Failed to decode response", "status": response.status_code, "text": response.text}
-
+        return self.session.post_json(url, json=payload)
+        
     def device_commands(self, device_id: UUID, commands: list[Command]) -> dict:
         """Execute SmartThings commands on a device."""
         device_id = self.validate_device_id(device_id)
