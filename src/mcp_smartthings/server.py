@@ -45,6 +45,7 @@ def get_devices(
 
 @mcp.tool(description="Get device status")
 def get_device_status(device_id: UUID):
+    device_id = location.validate_device_id(device_id)
     return location._device_status(device_id)
 
 
@@ -55,6 +56,7 @@ def execute_commands(device_id: UUID, commands: List[Command]):
         first component of a device is usually 'main', but there might be 2-3 switches.
 
     """
+    device_id = location.validate_device_id(device_id)
     return location.device_commands(device_id, commands)
 
 

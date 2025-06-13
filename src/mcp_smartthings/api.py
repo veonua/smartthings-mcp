@@ -111,6 +111,7 @@ class Location(ILocation):
             'components']
 
     def device_status(self, device_id: UUID | str) -> pd.DataFrame:
+        device_id = self.validate_device_id(device_id)
         status = self._device_status(device_id)
         df = pd.DataFrame(status)
         return df
@@ -166,6 +167,36 @@ class Location(ILocation):
             res[UUID(r['roomId'])] = r['name']
 
         return res
+
+    @cached_property
+    def device_ids(self) -> set[UUID]:
+        """Set of device UUIDs available in this location."""
+        devices = self.get_devices_short(include_health=False, include_status=False)
+        return {UUID(d['deviceId']) for d in devices}
+
+    def validate_device_id(self, device_id: UUID | str) -> UUID:
+        """Validate that a device ID exists in the location.
+
+        Args:
+            device_id: Device UUID or string representation.
+
+        Returns:
+            Normalised UUID if valid.
+
+        Raises:
+            ValueError: If the ID format is invalid or not known.
+        """
+        try:
+            device_uuid = UUID(str(device_id))
+        except (ValueError, AttributeError):
+            raise ValueError(f"'{device_id}' is not a valid UUID") from None
+
+        if device_uuid not in self.device_ids:
+            raise ValueError(
+                f"deviceId '{device_uuid}' is unknown, use get_devices to list valid ids"
+            )
+
+        return device_uuid
 
     def get_room_name(self, room_id: UUID) -> str:
         """Get room name by UUID."""
@@ -330,4 +361,5 @@ class Location(ILocation):
 
     def device_commands(self, device_id: UUID, commands: list[Command]) -> dict:
         """Execute SmartThings commands on a device."""
+        device_id = self.validate_device_id(device_id)
         return self._device_commands(device_id, commands)

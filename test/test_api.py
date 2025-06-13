@@ -15,6 +15,7 @@ def _make_location():
     loc = object.__new__(Location)
     loc.location_id = "loc1"
     loc.rooms = {room1Id: "Room 1"}
+    loc.device_ids = set()
     return loc
 
 
@@ -79,6 +80,8 @@ def test_get_devices_invalid(monkeypatch):
 
 def test_device_commands(monkeypatch):
     loc = _make_location()
+    valid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    loc.device_ids = {valid}
 
     captured = {}
 
@@ -90,8 +93,23 @@ def test_device_commands(monkeypatch):
     loc._device_commands = fake_post
 
     cmds = [{"component": "main", "capability": "switch", "command": "on", "arguments": []}]
-    res = loc.device_commands("dev1", cmds)
+    res = loc.device_commands(valid, cmds)
 
     assert res == {"status": "ok"}
-    assert captured["device_id"] == "dev1"
+    assert captured["device_id"] == valid
     assert captured["commands"] == cmds
+
+
+def test_validate_device_id():
+    loc = _make_location()
+    valid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    loc.device_ids = {valid}
+
+    assert loc.validate_device_id(str(valid)) == valid
+
+    with pytest.raises(ValueError):
+        loc.validate_device_id("not-a-uuid")
+
+    with pytest.raises(ValueError):
+        loc.validate_device_id(uuid.UUID("22222222-2222-2222-2222-222222222222"))
+
