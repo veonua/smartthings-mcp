@@ -14,7 +14,7 @@ class CustomSession(Session):
     This class is a placeholder for any custom session handling logic that may be needed.
     """
 
-    def __init__(self, base_url:str, auth:str, **kwargs):
+    def __init__(self, auth:str, base_url:str = "https://api.smartthings.com/", **kwargs):
         self.base_url = base_url
         self.headers = {
             'Accept': 'application/vnd.smartthings+json;v=20170916',

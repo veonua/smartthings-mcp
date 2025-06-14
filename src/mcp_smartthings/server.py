@@ -7,7 +7,7 @@ import logging
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
-from .api import (
+from api import (
     Attribute,
     CapabilitiesMode,
     Capability,
@@ -102,6 +102,13 @@ def get_device_history(
         paging_after_epoch=start_ms,
         paging_before_epoch=end_ms,
     )
+
+@mcp.tool(description="Get hub time")
+def get_hub_time() -> str:
+    """Get the current time of the hub."""
+    import datetime
+    now = datetime.datetime.now(location.timezone)
+    return f"{now} Timezone: {location.timezone}"
 
 if __name__ == "__main__":
     """Run the FastMCP server."""
