@@ -6,7 +6,7 @@ from uuid import UUID
 import pandas as pd
 from pydantic import BaseModel
 
-from custom_session import CustomSession
+from .custom_session import CustomSession
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +268,7 @@ class Location(ILocation):
                     room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                     category: ComponentCategory | None = None,
                     connection_type: ConnectionType | None = None):
-        url = f"devices?locationId={self.location_id}"
+        url = f"{BASE_URL}devices?locationId={self.location_id}"
         if capability is not None:
             if isinstance(capability, str):
                 capability = [capability]
