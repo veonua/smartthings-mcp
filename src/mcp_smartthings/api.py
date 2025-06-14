@@ -51,9 +51,11 @@ class ILocation:
     def device_status(self, device_id: UUID) -> dict: 
         pass
 
-    def event_history(self, device_id: str | None = None, limit: int = 500,
+    def event_history(self, device_id: UUID | None = None, limit: int = 500,
+                      capability: Capability | None = None,
+                      attribute: Attribute | None = None,
                       oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
-                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> pd.DataFrame:
+                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None):
         pass
 
     @cached_property
@@ -112,16 +114,69 @@ class Location(ILocation):
         status = self._device_status(device_id)
         return status
 
-    def _event_history(self, limit: int | None = None, device_id: UUID | None = None,
-                       oldest_first: bool = False,
-                       paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
-                       paging_before_epoch: int | None = None, paging_before_hash: int | None = None):
-        hub_id = self.location_id
+    def event_history(self, device_id: UUID | None = None, limit: int = 500,
+                      capability: Capability | None = None,
+                      attribute: Attribute | None = None,
+                      oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
+                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None):
 
+        """ response example:
+
+        {
+    "items": [
+        {
+            "deviceId": "854b7c13-4746-4d5b-8db9-bfc29405439f",
+            "deviceName": "Air Quality",
+            "locationId": "8db57189-6b62-4033-97d2-d2c53fdb599f",
+            "locationName": "Home",
+            "time": "2025-06-14T22:28:12.000+00:00",
+            "text": "Air Quality PM 10 was 108μg/m^3",
+            "component": "main",
+            "componentLabel": "main",
+            "capability": "dustSensor",
+            "attribute": "dustLevel",
+            "value": "108",
+            "unit": "μg/m^3",
+            "data": {},
+            "translatedAttributeName": "PM 10",
+            "translatedAttributeValue": "108",
+            "epoch": 1749940092827,
+            "hash": 2337940949
+        },
+        {
+            "deviceId": "854b7c13-4746-4d5b-8db9-bfc29405439f",
+            "deviceName": "Air Quality",
+            "locationId": "8db57189-6b62-4033-97d2-d2c53fdb599f",
+            "locationName": "Home",
+            "time": "2025-06-14T22:28:12.000+00:00",
+            "text": "Air Quality PM 2.5 was 8μg/m^3",
+            "component": "main",
+            "componentLabel": "main",
+            "capability": "dustSensor",
+            "attribute": "fineDustLevel",
+            "value": "8",
+            "unit": "μg/m^3",
+            "data": {},
+            "translatedAttributeName": "PM 2.5",
+            "translatedAttributeValue": "8",
+            "epoch": 1749940092672,
+            "hash": 314353991
+        },
+        ],
+        "_links": {
+            "next": {
+                "href": "https://api.smartthings.com/history/devices?pagingBeforeEpoch=1749939093938&pagingBeforeHash=3245964151&limit=20&oldestFirst=false&locationId=8db57189-6b62-4033-97d2-d2c53fdb599f&capability=carbonDioxideMeasurement"
+            },
+            "previous": {
+                "href": "https://api.smartthings.com/history/devices?pagingAfterEpoch=1749940092827&pagingAfterHash=2337940949&limit=20&oldestFirst=false&locationId=8db57189-6b62-4033-97d2-d2c53fdb599f&capability=carbonDioxideMeasurement"
+            }
+        }
+    }
+        """
         if limit is None:
             limit = 500
 
-        url = f"v1/history/devices?locationId={hub_id}&limit={limit}"
+        url = f"v1/history/devices?locationId={self.location_id}&limit={limit}"
 
         if paging_after_epoch is not None:
             url += f"&pagingAfterEpoch={paging_after_epoch}"
@@ -136,20 +191,28 @@ class Location(ILocation):
         if device_id is not None:
             url += f"&deviceId={device_id}"
 
-        return self.session.get(url).json()
+        events = self.session.get_json(url)
 
-    def event_history(self, device_id: str | None = None, limit: int = 500,
-                      oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
-                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> pd.DataFrame:
-        kwargs = locals()
-        kwargs.pop('self')
-        events = self._event_history(**kwargs)
-        df = pd.DataFrame(events['items']).drop(
-            columns=['deviceName', 'componentLabel', 'text', 'epoch', 'data', 'translatedAttributeName',
-                     'translatedAttributeValue', 'locationId', 'locationName', 'hash'])
+        # Filter items without pandas
+        filtered_items = []
+        for item in events['items']:
+            if capability is not None and item['capability'] != capability:
+                continue
+            if attribute is not None and item['attribute'] != attribute:
+                continue
 
-        df['unit'] = df['unit'].map(lambda x: None if x == "" else x)
-        return df
+            filtered_item = {
+            'deviceId': item['deviceId'],
+            'time': item['time'],
+            'component': item['component'],
+            'capability': item['capability'],
+            'attribute': item['attribute'],
+            'value': item['value'],
+            'unit': None if item['unit'] == "" else item['unit']
+            }
+            filtered_items.append(filtered_item)
+
+        return filtered_items
 
     def _rooms(self):
         return self.session.get_json(f"v1/locations/{self.location_id}/rooms")
