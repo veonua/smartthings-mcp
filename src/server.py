@@ -2,7 +2,7 @@ from datetime import datetime
 from os import environ
 from typing import List, Literal, Optional
 from uuid import UUID
-import logging 
+import logging
 
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
@@ -96,8 +96,15 @@ def get_device_history(
     start_ms = int(start.timestamp() * 1000)
     end_ms = int(end.timestamp() * 1000)
 
-    if (room_id is not None):
-        raise NotImplementedError("Room-based history aggregation is not implemented yet.")
+    if room_id is not None:
+        return location.room_history(
+            room_id=room_id,
+            attribute=attribute,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            granularity=granularity,
+            aggregate=aggregate,
+        )
 
     return location.event_history(
         device_id=device_id,
