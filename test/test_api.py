@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from src.st.history import EventHistoryItem, EventHistoryResponse
+from src.st.device import DeviceItem
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
@@ -45,7 +45,8 @@ def test_get_devices_url(monkeypatch):
 
     def fake_get(url):
         captured["url"] = url
-        return ["ok"]
+        devices: list[DeviceItem] = []
+        return devices
 
     loc._get_devices = fake_get
 
@@ -54,13 +55,12 @@ def test_get_devices_url(monkeypatch):
         capabilities_mode="or",
         include_restricted=True,
         room_id=room1Id,
-        include_health=False,
         include_status=True,
         category="Light",
         connection_type="LAN",
     )
 
-    assert res == ["ok"]
+    assert res == []
     expected_url = (
         f"devices?locationId=loc1"
         "&capability=motionSensor"
@@ -126,23 +126,23 @@ def test_bucket_time():
     assert _bucket_time(ts, "hourly") == ts.replace(minute=0, second=0, microsecond=0)
     assert _bucket_time(ts, "daily") == ts.replace(hour=0, minute=0, second=0, microsecond=0)
     with pytest.raises(ValueError):
-        _bucket_time(ts, "bogus")
+        _bucket_time(ts, "bogus") # type: ignore
 
 
 def test_aggregate_values():
-    values = [1, 2, 3]
-    assert _aggregate_values(values, "sum") == 6
-    assert _aggregate_values(values, "avg") == 2
-    assert _aggregate_values(values, "min") == 1
-    assert _aggregate_values(values, "max") == 3
+    values = [1.0, 2.0, 3.0]
+    assert _aggregate_values(values, "sum") == 6.0
+    assert _aggregate_values(values, "avg") == 2.0
+    assert _aggregate_values(values, "min") == 1.0
+    assert _aggregate_values(values, "max") == 3.0
     assert math.isnan(_aggregate_values([], "avg"))
     with pytest.raises(ValueError):
-        _aggregate_values(values, "bogus")
+        _aggregate_values(values, "bogus") # type: ignore
 
 
 def test_room_history_raw(monkeypatch):
     loc = _make_location()
-    loc.get_devices_short = lambda **kwargs: [
+    loc.get_devices_short = lambda **kwargs: [  # type: ignore
         {"deviceId": "dev1"},
         {"deviceId": "dev2"},
     ]
@@ -155,7 +155,7 @@ def test_room_history_raw(monkeypatch):
     def fake_event_history(device_id, *args, **kwargs):
         return events[device_id]
 
-    loc.event_history = fake_event_history
+    loc.event_history = fake_event_history # type: ignore
 
     res = loc.room_history(
         room_id=room1Id,
@@ -173,7 +173,7 @@ def test_room_history_raw(monkeypatch):
 
 def test_room_history_bucket_avg(monkeypatch):
     loc = _make_location()
-    loc.get_devices_short = lambda **kwargs: [
+    loc.get_devices_short = lambda **kwargs: [ # type: ignore
         {"deviceId": "dev1"},
         {"deviceId": "dev2"},
     ]
@@ -191,7 +191,7 @@ def test_room_history_bucket_avg(monkeypatch):
     def fake_event_history(device_id, *args, **kwargs):
         return events[device_id]
 
-    loc.event_history = fake_event_history
+    loc.event_history = fake_event_history # type: ignore
 
     res = loc.room_history(
         room_id=room1Id,

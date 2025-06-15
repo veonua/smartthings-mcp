@@ -22,6 +22,8 @@ import datetime
 from typing import Optional, Union
 from pydantic import BaseModel, Field
 from uuid import UUID
+
+from src.st.links import Links
 from .literals import Attribute, Capability
 
 class EventHistoryItem(BaseModel):
@@ -44,12 +46,6 @@ class EventHistoryItem(BaseModel):
     hash: int
 
 
-class Links(BaseModel):
-    class Link(BaseModel):
-        href: str
-
-    next: Link
-    previous: Link
 
 class EventHistoryResponse(BaseModel):
    

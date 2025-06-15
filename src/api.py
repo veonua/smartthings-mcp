@@ -1,10 +1,11 @@
 import logging
 from functools import cached_property
-from typing import List, Protocol, Dict
+from typing import Any, List, Protocol, Dict
 from uuid import UUID
 from datetime import datetime
 
 
+from src.st.device import DeviceItem, DeviceResponse
 from st.history import EventHistoryResponse
 from st.command import Command
 from st.literals import Aggregate, Attribute, CapabilitiesMode, Capability, ComponentCategory, ConnectionType, Granularity
@@ -38,14 +39,14 @@ class ILocation(Protocol):
 
     def get_devices(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                     include_restricted: bool = False,
-                    room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
+                    room_id: UUID | None = None, include_status: bool = True,
                     category: ComponentCategory | None = None,
-                    connection_type: ConnectionType | None = None) -> List[dict]:
+                    connection_type: ConnectionType | None = None) -> List[DeviceItem]:
         ...
 
     def get_devices_short(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                           include_restricted: bool = False,
-                          room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
+                          room_id: UUID | None = None, include_status: bool = True,
                           category: ComponentCategory | None = None,
                           connection_type: ConnectionType | None = None) -> List[dict]:
         ...
@@ -152,7 +153,7 @@ class Location(ILocation):
     @cached_property
     def device_ids(self) -> set[UUID]:
         """Set of device UUIDs available in this location."""
-        devices = self.get_devices_short(include_health=False, include_status=False)
+        devices = self.get_devices_short(include_status=False)
         return {UUID(d['deviceId']) for d in devices}
 
     def validate_device_id(self, device_id: UUID) -> UUID:
@@ -185,13 +186,13 @@ class Location(ILocation):
 
     ###
     def _get_devices(self, url: str):
-        return self.session.get_json(url)['items']
-                
+        return DeviceResponse.model_validate(self.session.get_json(url)).items
+
     def get_devices(self, capability: List[Capability] | Capability | None = None, capabilities_mode: CapabilitiesMode | None = None,
                     include_restricted: bool = False,
-                    room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
+                    room_id: UUID | None = None, include_status: bool = True,
                     category: ComponentCategory | None = None,
-                    connection_type: ConnectionType | None = None) -> List[dict]:
+                    connection_type: ConnectionType | None = None) -> List[DeviceItem]:
         url = f"devices?locationId={self.location_id}"
         if capability is not None:
             if isinstance(capability, str):
@@ -220,8 +221,6 @@ class Location(ILocation):
             if room_id not in self.rooms:
                 raise ValueError(f"roomId '{room_id}' is unknown, must be one of {self.rooms.keys()}")
             url += f"&roomId={room_id}"
-        if include_health:
-            url += "&includeHealth=true"
         if include_status:
             url += "&includeStatus=true"
         if connection_type is not None:
@@ -233,36 +232,33 @@ class Location(ILocation):
 
     def get_devices_short(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                           include_restricted: bool = False,
-                          room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
+                          room_id: UUID | None = None, include_status: bool = True,
                           category: ComponentCategory | None = None,
                           connection_type: ConnectionType | None = None) -> List[dict]:
-        devices = self.get_devices(capability, capabilities_mode, include_restricted, room_id, include_health,
-                                   include_status, category, connection_type)
+        devices = self.get_devices(capability, capabilities_mode, include_restricted, room_id, include_status, category, connection_type)
 
         filtered_devices = []
         for device in devices:
-            filtered_device = {'deviceId': device['deviceId'], 'label': device['label'],
-                               'manufacturerName': device['manufacturerName']}
+            filtered_device = {'deviceId': device.device_id, 'label': device.label,
+                               'manufacturerName': device.manufacturer_name}
 
-            if device.get('deviceModel') is not None:
-                filtered_device['deviceModel'] = device.get('deviceModel')
-            if device.get('roomId') is not None:
-                filtered_device['roomId'] = device.get('roomId')
+            if device.room_id is not None:
+                filtered_device['roomId'] = device.room_id
             filtered_device['components'] = []
-            for component in device['components']:
-                filtered_component = {'id': component['id'], 'label': component['label'], 'categories': []}
-                for _category in component['categories']:
-                    filtered_category = {'name': _category['name']}
+            for component in device.components:
+                filtered_component = {'id': component.id, 'label': component.label, 'categories': []}
+                for _category in component.categories:
+                    filtered_category = {'name': _category.name}
                     filtered_component['categories'].append(filtered_category)
 
                 filtered_component['capabilities'] = []
-                for _capability in component['capabilities']:
-                    if '.' in _capability['id'] or _capability['id'] in IGNORE_CAPABILITIES:
+                for _capability in component.capabilities:
+                    if '.' in _capability.id or _capability.id in IGNORE_CAPABILITIES:
                         continue
-                    filtered_capability = {'id': _capability['id']}
-                    if 'status' in _capability:
+                    filtered_capability: dict[str, Any] = {'id': _capability.id}
+                    if _capability.status is not None:
                         filtered_capability['status'] = {}
-                        for (k, v) in _capability['status'].items():
+                        for (k, v) in _capability.status.items():
                             if k.startswith('supported') or k in {'numberOfButtons', ''}:
                                 continue
                             filtered_capability['status'][k] = {}
@@ -274,13 +270,10 @@ class Location(ILocation):
                     filtered_component['capabilities'].append(filtered_capability)
                 filtered_device['components'].append(filtered_component)
             
-            #filtered_device['createTime'] = device['createTime']
-            if 'healthState' in device:
-                filtered_device['healthState'] = device['healthState']
 
-            if device.get('parentDeviceId') is not None:
-                filtered_device['parentDeviceId'] = device['parentDeviceId']
-            filtered_device['type'] = device['type']
+            if device.parent_device_id is not None:
+                filtered_device['parentDeviceId'] = device.parent_device_id
+            filtered_device['connection_type'] = device.connection_type
             filtered_devices.append(filtered_device)
 
         return filtered_devices
@@ -347,7 +340,6 @@ class Location(ILocation):
         """Aggregate history across all devices in a room."""
         devices = self.get_devices_short(
             room_id=room_id,
-            include_health=False,
             include_status=False,
         )
 

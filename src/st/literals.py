@@ -15,13 +15,15 @@ Attribute = Literal[
     'dustLevel', 'fineDustLevel', 'carbonDioxide', 'switch', 'atmosPressure',
     'button', 'presenceStatus', 'windowShade']
 
-ConnectionType = Literal['LAN', 'ZIGBEE', 'ZWAVE', 'EDGE_CHILD', 'MOBILE']
+ConnectionType = Literal['LAN', 'ZIGBEE', 'ZWAVE', 'EDGE_CHILD', 'MOBILE', 'MATTER', 'HUB', 'BLE_D2D']
 
 ComponentCategory = Literal[
     'Light', 'AirConditioner', 'AirQualityDetector', 'Battery', 'Blind', 'BluetoothTracker', 'ContactSensor',
     'Dishwasher', 'Hub', 'LeakSensor', 'MobilePresence', 'MotionSensor', 'MultiFunctionalSensor', 'Others',
     'PresenceSensor', 'RemoteController', 'SmartLock', 'SmokeDetector',
     'Switch', 'Television', 'Thermostat']
+
+ExecutionContext = Literal['CLOUD', 'LOCAL']
 
 Granularity = Literal["realtime", "5min", "hourly", "daily"]
 Aggregate = Literal["raw", "sum", "avg", "min", "max"]

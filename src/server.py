@@ -44,7 +44,6 @@ def get_devices(
     capabilities_mode: CapabilitiesMode | None = None,
     include_restricted: bool = False,
     room_id: UUID | None = None,
-    include_health: bool = True,
     include_status: bool = True,
     category: ComponentCategory | None = None,
     connection_type: ConnectionType | None = None,
@@ -117,8 +116,7 @@ def get_device_history(
 @mcp.tool(description="Get hub time")
 def get_hub_time() -> str:
     """Get the current time of the hub."""
-    import datetime
-    now = datetime.datetime.now(location.timezone)
+    now = datetime.now(location.timezone)
     return f"{now} Timezone: {location.timezone}"
 
 if __name__ == "__main__":
