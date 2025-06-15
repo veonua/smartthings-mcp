@@ -1,5 +1,6 @@
+from datetime import datetime
 from os import environ
-from typing import List
+from typing import List, Literal, Optional
 from uuid import UUID
 import logging 
 
@@ -7,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
 from api import (
+    Attribute,
     CapabilitiesMode,
     Capability,
     Command,
@@ -68,7 +70,51 @@ def execute_commands(device_id: UUID, commands: List[Command]):
     return location.device_commands(device_id, commands)
 
 
+@mcp.tool(description="Answer questions about past values or trends")
+def get_device_history(
+    *,
+    device_id: Optional[UUID] = None,
+    room_id:   Optional[UUID] = None,
+    attribute: Attribute,
+    start: datetime,
+    end: datetime,
+    granularity: Literal["realtime", "5min", "hourly", "daily"] = "hourly",
+    aggregate:   Literal["raw", "sum", "avg", "min", "max"]   = "raw",
+) -> List[dict]:
+    """
+    LLM-guidance
+    ------------
+    • Pick **one** of `device_id` or `room_id` (not both).  
+      – `device_id` → history for that device only.  
+      – `room_id`   → MCP auto-aggregates across devices in the room.  
+    • Use when the user asks how something has changed *over time* or wants
+      an average/graph for a past period.  
+    • `metric` must match a path from *Get Device Status*  
+      (e.g. "powerMeter.power", "temperature.value").  
+    • Cap the returned set to ≲500 points; raise `granularity` as needed.
+    """
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(end.timestamp() * 1000)
+
+    if (room_id is not None):
+        raise NotImplementedError("Room-based history aggregation is not implemented yet.")
+
+    return location.event_history(
+        device_id=device_id,
+        attribute=attribute,
+        limit=500,
+        paging_after_epoch=start_ms,
+        paging_before_epoch=end_ms,
+    )
+
+@mcp.tool(description="Get hub time")
+def get_hub_time() -> str:
+    """Get the current time of the hub."""
+    import datetime
+    now = datetime.datetime.now(location.timezone)
+    return f"{now} Timezone: {location.timezone}"
+
 if __name__ == "__main__":
     """Run the FastMCP server."""
-    mcp.run()
+    mcp.run(transport="sse")
 

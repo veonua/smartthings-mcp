@@ -1,82 +1,53 @@
 import logging
 from functools import cached_property
-from typing import List, Literal, Tuple
+from typing import List, Protocol
 from uuid import UUID
 
-import pandas as pd
-from pydantic import BaseModel
 
+from st.history import EventHistoryResponse
+from st.command import Command
+from st.literals import Attribute, CapabilitiesMode, Capability, ComponentCategory, ConnectionType
 from custom_session import CustomSession
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://api.smartthings.com/"
 
 IGNORE_CAPABILITIES = {'mediaPresets', 'firmwareUpdate', 'healthCheck', 'threeAxis', 'momentary', 'refresh',
                        'windowShadePreset', 'configuration', 'bridge', 'alarm', 'statelessPowerToggleButton'}
 
-Capability = Literal['button', 'motionSensor', 'dustSensor', 'carbonDioxideMeasurement',
-    'illuminanceMeasurement', 'relativeHumidityMeasurement', 'temperatureMeasurement', 'atmosphericPressureMeasurement',
-    'switch', 'signalStrength', 'powerMeter', 'presenceSensor', 'switchLevel', 'contactSensor', 'voltageMeasurement',
-    'windowShade', 'windowShadeLevel', 'battery', 'lock']
-CapabilitiesMode = Literal['and', 'or']
-Attribute = Literal[
-    'motion', 'battery', 'illuminance', 'temperature', 'tamper', 'atmosphericPressure', 'humidity', 'contact', 'power',
-    'energy', 'level', 'voltage', 'rssi', 'lqi', 'shadeLevel', 'volume', 'water', 'presence', 'lock',
-    'dustLevel', 'fineDustLevel', 'carbonDioxide', 'power', 'switch', 'atmosPressure',
-    'button', 'presence', 'presenceStatus', 'level', 'windowShade', 'shadeLevel']
-ConnectionType = Literal['LAN', 'ZIGBEE', 'ZWAVE', 'EDGE_CHILD', 'MOBILE']
-ComponentCategory = Literal[
-    'Light', 'AirConditioner', 'AirQualityDetector', 'Battery', 'Blind', 'BluetoothTracker', 'ContactSensor',
-    'Dishwasher', 'Hub', 'LeakSensor', 'MobilePresence', 'MotionSensor', 'MultiFunctionalSensor', 'Others',
-    'PresenceSensor', 'RemoteController', 'SmartLock', 'SmokeDetector',
-    'Switch', 'Television', 'Thermostat']
 
-
-class Command(BaseModel):
-    component: str
-    capability: Capability
-    command: str
-    arguments: list | None = None
-
-    def to_dict(self) -> dict:
-        return {
-            "component": self.component or "main",
-            "capability": self.capability,
-            "command": self.command,
-            "arguments": self.arguments or []
-        }
-
-class ILocation: 
+class ILocation(Protocol): 
     def device_status(self, device_id: UUID) -> dict: 
-        pass
+        ...
 
-    def event_history(self, device_id: str | None = None, limit: int = 500,
+    def event_history(self, device_id: UUID | None = None, limit: int = 500,
+                      capability: Capability | None = None,
+                      attribute: Attribute | None = None,
                       oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
-                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> pd.DataFrame:
-        pass
+                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> List[dict]:
+        ...
 
     @cached_property
     def rooms(self) -> dict[UUID, str]:
         """Get rooms UUID and names."""
-        pass
-   
+        ...
+
     def get_room_name(self, room_id: UUID) -> str:
-        pass
+        ...
 
     def get_devices(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                     include_restricted: bool = False,
                     room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                     category: ComponentCategory | None = None,
-                    type: ConnectionType | None = None):
-        pass
+                    connection_type: ConnectionType | None = None) -> List[dict]:
+        ...
 
     def get_devices_short(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                           include_restricted: bool = False,
                           room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                           category: ComponentCategory | None = None,
-                          connection_type: ConnectionType | None = None):
-        pass
+                          connection_type: ConnectionType | None = None) -> List[dict]:
+        ...
 
     
 
@@ -84,7 +55,7 @@ class Location(ILocation):
     session : CustomSession
     
     def __init__(self, auth: str, location_id: UUID | None = None):
-        self.session = CustomSession(BASE_URL, auth=auth)
+        self.session = CustomSession(auth=auth)
         self.session.headers = {
             'Accept': 'application/vnd.smartthings+json;v=20170916',
             'Authorization': "Bearer " + auth,
@@ -99,7 +70,7 @@ class Location(ILocation):
         import pytz
 
         self.timezone = pytz.timezone(self.location['timeZoneId'])
-        # self.timeZoneOffset = datetime.datetime.now(timezone).strftime('%z')
+        #self.timeZoneOffset = datetime.datetime.now(self.timezone).strftime('%z')
 
     def _location(self):
         return self.session.get_json(f"v1/locations/{self.location_id}")
@@ -112,16 +83,16 @@ class Location(ILocation):
         status = self._device_status(device_id)
         return status
 
-    def _event_history(self, limit: int | None = None, device_id: UUID | None = None,
-                       oldest_first: bool = False,
-                       paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
-                       paging_before_epoch: int | None = None, paging_before_hash: int | None = None):
-        hub_id = self.location_id
+    def event_history(self, device_id: UUID | None = None, limit: int = 500,
+                      capability: Capability | None = None,
+                      attribute: Attribute | None = None,
+                      oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
+                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> List[dict]:
 
         if limit is None:
             limit = 500
 
-        url = f"v1/history/devices?locationId={hub_id}&limit={limit}"
+        url = f"v1/history/devices?locationId={self.location_id}&limit={limit}"
 
         if paging_after_epoch is not None:
             url += f"&pagingAfterEpoch={paging_after_epoch}"
@@ -136,20 +107,29 @@ class Location(ILocation):
         if device_id is not None:
             url += f"&deviceId={device_id}"
 
-        return self.session.get(url).json()
+        events_data = self.session.get_json(url)
+        events = EventHistoryResponse.model_validate(events_data)
 
-    def event_history(self, device_id: str | None = None, limit: int = 500,
-                      oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
-                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> pd.DataFrame:
-        kwargs = locals()
-        kwargs.pop('self')
-        events = self._event_history(**kwargs)
-        df = pd.DataFrame(events['items']).drop(
-            columns=['deviceName', 'componentLabel', 'text', 'epoch', 'data', 'translatedAttributeName',
-                     'translatedAttributeValue', 'locationId', 'locationName', 'hash'])
+        # Filter items without pandas
+        filtered_items = []
+        for item in events.items:
+            if capability is not None and item.capability != capability:
+                continue
+            if attribute is not None and item.attribute != attribute:
+                continue
 
-        df['unit'] = df['unit'].map(lambda x: None if x == "" else x)
-        return df
+            filtered_item = {
+                'deviceId': item.device_id,
+                'time': item.time,
+                'component': item.component,
+                'capability': item.capability,
+                'attribute': item.attribute,
+                'value': item.value,
+                'unit': None if item.unit == "" else item.unit
+            }
+            filtered_items.append(filtered_item)
+
+        return filtered_items
 
     def _rooms(self):
         return self.session.get_json(f"v1/locations/{self.location_id}/rooms")
@@ -204,7 +184,7 @@ class Location(ILocation):
                     include_restricted: bool = False,
                     room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                     category: ComponentCategory | None = None,
-                    connection_type: ConnectionType | None = None):
+                    connection_type: ConnectionType | None = None) -> List[dict]:
         url = f"devices?locationId={self.location_id}"
         if capability is not None:
             if isinstance(capability, str):
@@ -248,7 +228,7 @@ class Location(ILocation):
                           include_restricted: bool = False,
                           room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                           category: ComponentCategory | None = None,
-                          connection_type: ConnectionType | None = None):
+                          connection_type: ConnectionType | None = None) -> List[dict]:
         devices = self.get_devices(capability, capabilities_mode, include_restricted, room_id, include_health,
                                    include_status, category, connection_type)
 
@@ -264,18 +244,18 @@ class Location(ILocation):
             filtered_device['components'] = []
             for component in device['components']:
                 filtered_component = {'id': component['id'], 'label': component['label'], 'categories': []}
-                for category in component['categories']:
-                    filtered_category = {'name': category['name']}
+                for _category in component['categories']:
+                    filtered_category = {'name': _category['name']}
                     filtered_component['categories'].append(filtered_category)
 
                 filtered_component['capabilities'] = []
-                for capability in component['capabilities']:
-                    if '.' in capability['id'] or capability['id'] in IGNORE_CAPABILITIES:
+                for _capability in component['capabilities']:
+                    if '.' in _capability['id'] or _capability['id'] in IGNORE_CAPABILITIES:
                         continue
-                    filtered_capability = {'id': capability['id']}
-                    if 'status' in capability:
+                    filtered_capability = {'id': _capability['id']}
+                    if 'status' in _capability:
                         filtered_capability['status'] = {}
-                        for (k, v) in capability['status'].items():
+                        for (k, v) in _capability['status'].items():
                             if k.startswith('supported') or k in {'numberOfButtons', ''}:
                                 continue
                             filtered_capability['status'][k] = {}
@@ -308,25 +288,25 @@ class Location(ILocation):
                 continue
             return k, v['value'], v.get('unit'), v.get('timestamp')
 
-    def devices_df(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        _devices = self.get_devices_short()
+    # def devices_df(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    #     _devices = self.get_devices_short()
 
-        d = [(device['deviceId'], device['components'][0]['categories'][-1]['name'], device['label'],
-              # device['manufacturerName'],  device.get('deviceManufacturerCode'), device['locationId'], device['presentationId'],device['profile']['id'],  device.get('restrictionTier')
-              device.get('roomId'), device['createTime'], device.get('parentDeviceId'), device['type']
-              ) for device in _devices]
+    #     d = [(device['deviceId'], device['components'][0]['categories'][-1]['name'], device['label'],
+    #           # device['manufacturerName'],  device.get('deviceManufacturerCode'), device['locationId'], device['presentationId'],device['profile']['id'],  device.get('restrictionTier')
+    #           device.get('roomId'), device['createTime'], device.get('parentDeviceId'), device['type']
+    #           ) for device in _devices]
 
-        c = [(device['deviceId'], component['id'], capability['id'], *self.get_status(capability.get('status'))) for
-             device in _devices for component in device['components'] for capability in component['capabilities']]
+    #     c = [(device['deviceId'], component['id'], capability['id'], *self.get_status(capability.get('status'))) for
+    #          device in _devices for component in device['components'] for capability in component['capabilities']]
 
-        devices_df = pd.DataFrame(d, columns=['deviceId', 'category', 'name', 'roomId', 'createTime', 'parentDeviceId',
-                                              'type'])  # .set_index('deviceId')
-        rooms = self.rooms
-        devices_df['room'] = devices_df['roomId'].map(lambda x: rooms.get(x, str(x)))
-        devices_df.drop(columns=['roomId'], inplace=True)
-        capabilities_df = pd.DataFrame(c, columns=['deviceId', 'component', 'capability', 'attribute', 'value', 'unit',
-                                                   'timestamp'])
-        return devices_df, capabilities_df
+    #     devices_df = pd.DataFrame(d, columns=['deviceId', 'category', 'name', 'roomId', 'createTime', 'parentDeviceId',
+    #                                           'type'])  # .set_index('deviceId')
+    #     rooms = self.rooms
+    #     devices_df['room'] = devices_df['roomId'].map(lambda x: rooms.get(x, str(x)))
+    #     devices_df.drop(columns=['roomId'], inplace=True)
+    #     capabilities_df = pd.DataFrame(c, columns=['deviceId', 'component', 'capability', 'attribute', 'value', 'unit',
+    #                                                'timestamp'])
+    #     return devices_df, capabilities_df
 
     def _device_commands(self, device_id: UUID, commands: list[Command]) -> dict:
         """Low level API call to execute commands on a device.
