@@ -10,7 +10,6 @@ from custom_session import CustomSession
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://api.smartthings.com/"
 
 IGNORE_CAPABILITIES = {'mediaPresets', 'firmwareUpdate', 'healthCheck', 'threeAxis', 'momentary', 'refresh',
                        'windowShadePreset', 'configuration', 'bridge', 'alarm', 'statelessPowerToggleButton'}
@@ -21,10 +20,10 @@ Capability = Literal['button', 'motionSensor', 'dustSensor', 'carbonDioxideMeasu
     'windowShade', 'windowShadeLevel', 'battery', 'lock']
 CapabilitiesMode = Literal['and', 'or']
 Attribute = Literal[
-    'motion', 'battery', 'illuminance', 'temperature', 'tamper', 'atmosphericPressure', 'humidity', 'contact', 'power',
-    'energy', 'level', 'voltage', 'rssi', 'lqi', 'shadeLevel', 'volume', 'water', 'presence', 'lock',
-    'dustLevel', 'fineDustLevel', 'carbonDioxide', 'power', 'switch', 'atmosPressure',
-    'button', 'presence', 'presenceStatus', 'level', 'windowShade', 'shadeLevel']
+    'motion', 'battery', 'illuminance', 'temperature', 'tamper', 'atmosphericPressure', 'humidity', 'contact',
+    'power', 'energy', 'level', 'voltage', 'rssi', 'lqi', 'shadeLevel', 'volume', 'water', 'presence', 'lock',
+    'dustLevel', 'fineDustLevel', 'carbonDioxide', 'switch', 'atmosPressure',
+    'button', 'presenceStatus', 'windowShade']
 ConnectionType = Literal['LAN', 'ZIGBEE', 'ZWAVE', 'EDGE_CHILD', 'MOBILE']
 ComponentCategory = Literal[
     'Light', 'AirConditioner', 'AirQualityDetector', 'Battery', 'Blind', 'BluetoothTracker', 'ContactSensor',
@@ -86,7 +85,7 @@ class Location(ILocation):
     session : CustomSession
     
     def __init__(self, auth: str, location_id: UUID | None = None):
-        self.session = CustomSession(BASE_URL, auth=auth)
+        self.session = CustomSession(auth=auth)
         self.session.headers = {
             'Accept': 'application/vnd.smartthings+json;v=20170916',
             'Authorization': "Bearer " + auth,
@@ -101,7 +100,7 @@ class Location(ILocation):
         import pytz
 
         self.timezone = pytz.timezone(self.location['timeZoneId'])
-        # self.timeZoneOffset = datetime.datetime.now(timezone).strftime('%z')
+        #self.timeZoneOffset = datetime.datetime.now(self.timezone).strftime('%z')
 
     def _location(self):
         return self.session.get_json(f"v1/locations/{self.location_id}")

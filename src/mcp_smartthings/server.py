@@ -93,12 +93,22 @@ def get_device_history(
       (e.g. "powerMeter.power", "temperature.value").  
     • Cap the returned set to ≲500 points; raise `granularity` as needed.
     """
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(end.timestamp() * 1000)
     return location.event_history(
         device_id=device_id,
+        attribute=attribute,
         limit=500,
-        paging_after_epoch=int(start.timestamp()),
-        paging_before_epoch=int(end.timestamp()),
+        paging_after_epoch=start_ms,
+        paging_before_epoch=end_ms,
     )
+
+@mcp.tool(description="Get hub time")
+def get_hub_time() -> str:
+    """Get the current time of the hub."""
+    import datetime
+    now = datetime.datetime.now(location.timezone)
+    return f"{now} Timezone: {location.timezone}"
 
 if __name__ == "__main__":
     """Run the FastMCP server."""
