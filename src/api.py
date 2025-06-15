@@ -1,12 +1,12 @@
 import logging
 from functools import cached_property
-from typing import List, Literal, Tuple
+from typing import List, Protocol
 from uuid import UUID
 
-import pandas as pd
-from pydantic import BaseModel
-
-from custom_session import CustomSession
+from .custom_session import CustomSession
+from st.history import EventHistoryResponse
+from st.command import Command
+from st.literals import Attribute, CapabilitiesMode, Capability, ComponentCategory, ConnectionType
 
 logger = logging.getLogger(__name__)
 
@@ -14,70 +14,39 @@ logger = logging.getLogger(__name__)
 IGNORE_CAPABILITIES = {'mediaPresets', 'firmwareUpdate', 'healthCheck', 'threeAxis', 'momentary', 'refresh',
                        'windowShadePreset', 'configuration', 'bridge', 'alarm', 'statelessPowerToggleButton'}
 
-Capability = Literal['button', 'motionSensor', 'dustSensor', 'carbonDioxideMeasurement',
-    'illuminanceMeasurement', 'relativeHumidityMeasurement', 'temperatureMeasurement', 'atmosphericPressureMeasurement',
-    'switch', 'signalStrength', 'powerMeter', 'presenceSensor', 'switchLevel', 'contactSensor', 'voltageMeasurement',
-    'windowShade', 'windowShadeLevel', 'battery', 'lock']
-CapabilitiesMode = Literal['and', 'or']
-Attribute = Literal[
-    'motion', 'battery', 'illuminance', 'temperature', 'tamper', 'atmosphericPressure', 'humidity', 'contact',
-    'power', 'energy', 'level', 'voltage', 'rssi', 'lqi', 'shadeLevel', 'volume', 'water', 'presence', 'lock',
-    'dustLevel', 'fineDustLevel', 'carbonDioxide', 'switch', 'atmosPressure',
-    'button', 'presenceStatus', 'windowShade']
-ConnectionType = Literal['LAN', 'ZIGBEE', 'ZWAVE', 'EDGE_CHILD', 'MOBILE']
-ComponentCategory = Literal[
-    'Light', 'AirConditioner', 'AirQualityDetector', 'Battery', 'Blind', 'BluetoothTracker', 'ContactSensor',
-    'Dishwasher', 'Hub', 'LeakSensor', 'MobilePresence', 'MotionSensor', 'MultiFunctionalSensor', 'Others',
-    'PresenceSensor', 'RemoteController', 'SmartLock', 'SmokeDetector',
-    'Switch', 'Television', 'Thermostat']
 
-
-class Command(BaseModel):
-    component: str
-    capability: Capability
-    command: str
-    arguments: list | None = None
-
-    def to_dict(self) -> dict:
-        return {
-            "component": self.component or "main",
-            "capability": self.capability,
-            "command": self.command,
-            "arguments": self.arguments or []
-        }
-
-class ILocation: 
+class ILocation(Protocol): 
     def device_status(self, device_id: UUID) -> dict: 
-        pass
+        ...
 
     def event_history(self, device_id: UUID | None = None, limit: int = 500,
                       capability: Capability | None = None,
                       attribute: Attribute | None = None,
                       oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
-                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None):
-        pass
+                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> List[dict]:
+        ...
 
     @cached_property
     def rooms(self) -> dict[UUID, str]:
         """Get rooms UUID and names."""
-        pass
-   
+        ...
+
     def get_room_name(self, room_id: UUID) -> str:
-        pass
+        ...
 
     def get_devices(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                     include_restricted: bool = False,
                     room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                     category: ComponentCategory | None = None,
-                    type: ConnectionType | None = None):
-        pass
+                    connection_type: ConnectionType | None = None) -> List[dict]:
+        ...
 
     def get_devices_short(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                           include_restricted: bool = False,
                           room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                           category: ComponentCategory | None = None,
-                          connection_type: ConnectionType | None = None):
-        pass
+                          connection_type: ConnectionType | None = None) -> List[dict]:
+        ...
 
     
 
@@ -117,61 +86,8 @@ class Location(ILocation):
                       capability: Capability | None = None,
                       attribute: Attribute | None = None,
                       oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
-                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None):
+                      paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> List[dict]:
 
-        """ response example:
-
-        {
-    "items": [
-        {
-            "deviceId": "854b7c13-4746-4d5b-8db9-bfc29405439f",
-            "deviceName": "Air Quality",
-            "locationId": "8db57189-6b62-4033-97d2-d2c53fdb599f",
-            "locationName": "Home",
-            "time": "2025-06-14T22:28:12.000+00:00",
-            "text": "Air Quality PM 10 was 108μg/m^3",
-            "component": "main",
-            "componentLabel": "main",
-            "capability": "dustSensor",
-            "attribute": "dustLevel",
-            "value": "108",
-            "unit": "μg/m^3",
-            "data": {},
-            "translatedAttributeName": "PM 10",
-            "translatedAttributeValue": "108",
-            "epoch": 1749940092827,
-            "hash": 2337940949
-        },
-        {
-            "deviceId": "854b7c13-4746-4d5b-8db9-bfc29405439f",
-            "deviceName": "Air Quality",
-            "locationId": "8db57189-6b62-4033-97d2-d2c53fdb599f",
-            "locationName": "Home",
-            "time": "2025-06-14T22:28:12.000+00:00",
-            "text": "Air Quality PM 2.5 was 8μg/m^3",
-            "component": "main",
-            "componentLabel": "main",
-            "capability": "dustSensor",
-            "attribute": "fineDustLevel",
-            "value": "8",
-            "unit": "μg/m^3",
-            "data": {},
-            "translatedAttributeName": "PM 2.5",
-            "translatedAttributeValue": "8",
-            "epoch": 1749940092672,
-            "hash": 314353991
-        },
-        ],
-        "_links": {
-            "next": {
-                "href": "https://api.smartthings.com/history/devices?pagingBeforeEpoch=1749939093938&pagingBeforeHash=3245964151&limit=20&oldestFirst=false&locationId=8db57189-6b62-4033-97d2-d2c53fdb599f&capability=carbonDioxideMeasurement"
-            },
-            "previous": {
-                "href": "https://api.smartthings.com/history/devices?pagingAfterEpoch=1749940092827&pagingAfterHash=2337940949&limit=20&oldestFirst=false&locationId=8db57189-6b62-4033-97d2-d2c53fdb599f&capability=carbonDioxideMeasurement"
-            }
-        }
-    }
-        """
         if limit is None:
             limit = 500
 
@@ -190,24 +106,25 @@ class Location(ILocation):
         if device_id is not None:
             url += f"&deviceId={device_id}"
 
-        events = self.session.get_json(url)
+        events_data = self.session.get_json(url)
+        events = EventHistoryResponse.model_validate(events_data)
 
         # Filter items without pandas
         filtered_items = []
-        for item in events['items']:
-            if capability is not None and item['capability'] != capability:
+        for item in events.items:
+            if capability is not None and item.capability != capability:
                 continue
-            if attribute is not None and item['attribute'] != attribute:
+            if attribute is not None and item.attribute != attribute:
                 continue
 
             filtered_item = {
-            'deviceId': item['deviceId'],
-            'time': item['time'],
-            'component': item['component'],
-            'capability': item['capability'],
-            'attribute': item['attribute'],
-            'value': item['value'],
-            'unit': None if item['unit'] == "" else item['unit']
+                'deviceId': item.device_id,
+                'time': item.time,
+                'component': item.component,
+                'capability': item.capability,
+                'attribute': item.attribute,
+                'value': item.value,
+                'unit': None if item.unit == "" else item.unit
             }
             filtered_items.append(filtered_item)
 
@@ -266,7 +183,7 @@ class Location(ILocation):
                     include_restricted: bool = False,
                     room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                     category: ComponentCategory | None = None,
-                    connection_type: ConnectionType | None = None):
+                    connection_type: ConnectionType | None = None) -> List[dict]:
         url = f"devices?locationId={self.location_id}"
         if capability is not None:
             if isinstance(capability, str):
@@ -310,7 +227,7 @@ class Location(ILocation):
                           include_restricted: bool = False,
                           room_id: UUID | None = None, include_health: bool = True, include_status: bool = True,
                           category: ComponentCategory | None = None,
-                          connection_type: ConnectionType | None = None):
+                          connection_type: ConnectionType | None = None) -> List[dict]:
         devices = self.get_devices(capability, capabilities_mode, include_restricted, room_id, include_health,
                                    include_status, category, connection_type)
 
@@ -370,25 +287,25 @@ class Location(ILocation):
                 continue
             return k, v['value'], v.get('unit'), v.get('timestamp')
 
-    def devices_df(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        _devices = self.get_devices_short()
+    # def devices_df(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    #     _devices = self.get_devices_short()
 
-        d = [(device['deviceId'], device['components'][0]['categories'][-1]['name'], device['label'],
-              # device['manufacturerName'],  device.get('deviceManufacturerCode'), device['locationId'], device['presentationId'],device['profile']['id'],  device.get('restrictionTier')
-              device.get('roomId'), device['createTime'], device.get('parentDeviceId'), device['type']
-              ) for device in _devices]
+    #     d = [(device['deviceId'], device['components'][0]['categories'][-1]['name'], device['label'],
+    #           # device['manufacturerName'],  device.get('deviceManufacturerCode'), device['locationId'], device['presentationId'],device['profile']['id'],  device.get('restrictionTier')
+    #           device.get('roomId'), device['createTime'], device.get('parentDeviceId'), device['type']
+    #           ) for device in _devices]
 
-        c = [(device['deviceId'], component['id'], capability['id'], *self.get_status(capability.get('status'))) for
-             device in _devices for component in device['components'] for capability in component['capabilities']]
+    #     c = [(device['deviceId'], component['id'], capability['id'], *self.get_status(capability.get('status'))) for
+    #          device in _devices for component in device['components'] for capability in component['capabilities']]
 
-        devices_df = pd.DataFrame(d, columns=['deviceId', 'category', 'name', 'roomId', 'createTime', 'parentDeviceId',
-                                              'type'])  # .set_index('deviceId')
-        rooms = self.rooms
-        devices_df['room'] = devices_df['roomId'].map(lambda x: rooms.get(x, str(x)))
-        devices_df.drop(columns=['roomId'], inplace=True)
-        capabilities_df = pd.DataFrame(c, columns=['deviceId', 'component', 'capability', 'attribute', 'value', 'unit',
-                                                   'timestamp'])
-        return devices_df, capabilities_df
+    #     devices_df = pd.DataFrame(d, columns=['deviceId', 'category', 'name', 'roomId', 'createTime', 'parentDeviceId',
+    #                                           'type'])  # .set_index('deviceId')
+    #     rooms = self.rooms
+    #     devices_df['room'] = devices_df['roomId'].map(lambda x: rooms.get(x, str(x)))
+    #     devices_df.drop(columns=['roomId'], inplace=True)
+    #     capabilities_df = pd.DataFrame(c, columns=['deviceId', 'component', 'capability', 'attribute', 'value', 'unit',
+    #                                                'timestamp'])
+    #     return devices_df, capabilities_df
 
     def _device_commands(self, device_id: UUID, commands: list[Command]) -> dict:
         """Low level API call to execute commands on a device.

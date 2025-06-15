@@ -95,6 +95,10 @@ def get_device_history(
     """
     start_ms = int(start.timestamp() * 1000)
     end_ms = int(end.timestamp() * 1000)
+
+    if (room_id is not None):
+        raise NotImplementedError("Room-based history aggregation is not implemented yet.")
+
     return location.event_history(
         device_id=device_id,
         attribute=attribute,

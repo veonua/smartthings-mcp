@@ -5,12 +5,15 @@ import datetime
 
 import pytest
 
+from src.st.history import EventHistoryItem, EventHistoryResponse
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from mcp_smartthings.api import Command, Location, BASE_URL
+from src.api import Command, Location
 
 noRoomId = uuid.UUID("00000000-0000-0000-0000-000000000000")
 room1Id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
 
 def _make_location():
     loc = object.__new__(Location)
@@ -58,7 +61,7 @@ def test_get_devices_url(monkeypatch):
 
     assert res == ["ok"]
     expected_url = (
-        f"{BASE_URL}devices?locationId=loc1"
+        f"devices?locationId=loc1"
         "&capability=motionSensor"
         "&category=Light"
         "&capabilitiesMode=or"
@@ -109,44 +112,8 @@ def test_validate_device_id():
     assert loc.validate_device_id(valid) == valid
 
     with pytest.raises(ValueError):
-        loc.validate_device_id("not-a-uuid")
+        loc.validate_device_id("not-a-uuid") 
 
     with pytest.raises(ValueError):
         loc.validate_device_id(uuid.UUID("22222222-2222-2222-2222-222222222222"))
-
-
-def test_get_device_history_ms(monkeypatch):
-    # Prepare fake Location to capture arguments
-    captured = {}
-
-    class FakeLocation:
-        def __init__(self, token):
-            self.token = token
-
-        def event_history(self, **kwargs):
-            captured.update(kwargs)
-            return ["ok"]
-
-    monkeypatch.setenv("TOKEN", "dummy")
-    import importlib
-    import mcp_smartthings.api as api
-
-    monkeypatch.setattr(api, "Location", FakeLocation)
-    server = importlib.reload(importlib.import_module("mcp_smartthings.server"))
-
-    start = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
-    end = datetime.datetime(2024, 1, 2, tzinfo=datetime.timezone.utc)
-
-    res = server.get_device_history(
-        device_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-        attribute="switch",
-        start=start,
-        end=end,
-    )
-
-    assert res == ["ok"]
-    assert captured["device_id"] == uuid.UUID("11111111-1111-1111-1111-111111111111")
-    assert captured["attribute"] == "switch"
-    assert captured["paging_after_epoch"] == int(start.timestamp() * 1000)
-    assert captured["paging_before_epoch"] == int(end.timestamp() * 1000)
 

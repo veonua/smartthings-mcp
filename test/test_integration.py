@@ -2,12 +2,12 @@ import os
 import pytest
 import dotenv
 
-from mcp_smartthings.api import Location
+from src.api import Location
 
 dotenv.load_dotenv()
-TOKEN = os.getenv("TOKEN")
+TOKEN = os.getenv("TOKEN", "")
 
-pytestmark = pytest.mark.skipif(TOKEN is None, reason="TOKEN environment variable not set")
+pytestmark = pytest.mark.skipif(not TOKEN, reason="TOKEN environment variable not set")
 
 
 def _get_location():
@@ -28,6 +28,6 @@ def test_event_history():
     if not devices:
         pytest.skip("no devices available")
     first_device_id = devices[0]["deviceId"]
-    history_df = loc.event_history(device_id=first_device_id, limit=1)
-    assert not history_df.empty
-    assert "deviceId" in history_df.columns
+    history = loc.event_history(device_id=first_device_id, limit=1)
+    assert len(history) == 1
+    assert "deviceId" in history[0]
