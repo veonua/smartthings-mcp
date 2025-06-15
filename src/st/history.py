@@ -33,8 +33,8 @@ class EventHistoryItem(BaseModel):
     text: str
     component: str
     component_label: str = Field(..., alias="componentLabel")
-    capability: Capability
-    attribute: Attribute
+    capability: Union[Capability, str]  # Capability can be a string or a specific enum type
+    attribute: Union[Attribute, str]  # Attribute can be a string or a specific enum type
     value: Union[str, int, float]
     unit: Optional[str] = None
     data: dict = {}
@@ -54,10 +54,10 @@ class Links(BaseModel):
 class EventHistoryResponse(BaseModel):
    
     items: list[EventHistoryItem]
-    links: Links = Field(alias="_links")
+    links: Optional[Links] = Field(default=None, alias="_links")
 
     def to_dict(self) -> dict:
         return {
             "items": [item.model_dump(by_alias=True) for item in self.items],
-            "_links": self.links.model_dump(by_alias=True)
+            "_links": self.links.model_dump(by_alias=True) if self.links else None
         }

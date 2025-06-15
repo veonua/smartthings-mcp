@@ -7,7 +7,7 @@ from datetime import datetime
 
 from st.history import EventHistoryResponse
 from st.command import Command
-from st.literals import Attribute, CapabilitiesMode, Capability, ComponentCategory, ConnectionType
+from st.literals import Aggregate, Attribute, CapabilitiesMode, Capability, ComponentCategory, ConnectionType, Granularity
 from custom_session import CustomSession
 
 logger = logging.getLogger(__name__)
@@ -108,8 +108,14 @@ class Location(ILocation):
         if device_id is not None:
             url += f"&deviceId={device_id}"
 
-        events_data = self.session.get_json(url)
-        events = EventHistoryResponse.model_validate(events_data)
+        events_data = {}
+        try:
+            events_data = self.session.get_json(url)
+            events = EventHistoryResponse.model_validate(events_data)
+        except Exception as e:
+            logger.error(f"Failed to parse event history response: {e}")
+            logger.debug(f"Response data: {events_data}")
+            raise
 
         # Filter items without pandas
         filtered_items = []
@@ -332,11 +338,11 @@ class Location(ILocation):
     def room_history(
         self,
         room_id: UUID,
-        attribute: Attribute,
-        start_ms: int,
-        end_ms: int,
-        granularity: str,
-        aggregate: str,
+        attribute: Attribute | None = None,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
+        granularity: Granularity = "realtime",
+        aggregate: Aggregate = "raw",
     ) -> List[dict]:
         """Aggregate history across all devices in a room."""
         devices = self.get_devices_short(
@@ -381,7 +387,7 @@ class Location(ILocation):
         return result
 
 
-def _bucket_time(ts: datetime, granularity: str) -> datetime:
+def _bucket_time(ts: datetime, granularity: Granularity = "realtime") -> datetime:
     """Round a timestamp down to the given granularity."""
     if granularity == "realtime":
         return ts
@@ -394,7 +400,7 @@ def _bucket_time(ts: datetime, granularity: str) -> datetime:
     raise ValueError(f"Unknown granularity: {granularity}")
 
 
-def _aggregate_values(values: List[float], agg: str) -> float:
+def _aggregate_values(values: List[float], agg: Aggregate = "raw") -> float:
     """Aggregate numeric values according to agg method."""
     if not values:
         return float("nan")

@@ -23,4 +23,5 @@ ComponentCategory = Literal[
     'PresenceSensor', 'RemoteController', 'SmartLock', 'SmokeDetector',
     'Switch', 'Television', 'Thermostat']
 
-
+Granularity = Literal["realtime", "5min", "hourly", "daily"]
+Aggregate = Literal["raw", "sum", "avg", "min", "max"]

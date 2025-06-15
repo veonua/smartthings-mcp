@@ -31,3 +31,15 @@ def test_event_history():
     history = loc.event_history(device_id=first_device_id, limit=1)
     assert len(history) == 1
     assert "deviceId" in history[0]
+
+
+def test_room_history():
+    loc = _get_location()
+    rooms = loc.rooms
+    if not rooms:
+        pytest.skip("no rooms available")
+
+    first_room_id = next(iter(rooms.keys()))
+    history = loc.room_history(room_id=first_room_id)
+    assert len(history) > 0
+    assert "time" in history[0]
