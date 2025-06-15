@@ -73,12 +73,12 @@ def test_get_devices_url(monkeypatch):
     )
     assert captured["url"] == expected_url
 
-
+# pyright: ignore
 def test_get_devices_invalid(monkeypatch):
     loc = _make_location()
     loc._get_devices = lambda url: []
     with pytest.raises(ValueError):
-        loc.get_devices(capability="unknown")
+        loc.get_devices(capability="unknown")  # type: ignore
     with pytest.raises(ValueError):
         loc.get_devices(room_id=noRoomId)
 
@@ -113,7 +113,7 @@ def test_validate_device_id():
     assert loc.validate_device_id(valid) == valid
 
     with pytest.raises(ValueError):
-        loc.validate_device_id("not-a-uuid") 
+        loc.validate_device_id("not-a-uuid")  # type: ignore
 
     with pytest.raises(ValueError):
         loc.validate_device_id(uuid.UUID("22222222-2222-2222-2222-222222222222"))
