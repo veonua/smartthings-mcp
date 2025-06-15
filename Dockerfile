@@ -9,4 +9,4 @@ RUN uv pip install --system --prod
 
 COPY src ./src
 
-CMD ["uv", "run", "src/mcp_smartthings/server.py"]
+CMD ["uv", "run", "src/server.py"]

@@ -3,10 +3,11 @@ from functools import cached_property
 from typing import List, Protocol
 from uuid import UUID
 
-from .custom_session import CustomSession
+
 from st.history import EventHistoryResponse
 from st.command import Command
 from st.literals import Attribute, CapabilitiesMode, Capability, ComponentCategory, ConnectionType
+from custom_session import CustomSession
 
 logger = logging.getLogger(__name__)
 
@@ -243,18 +244,18 @@ class Location(ILocation):
             filtered_device['components'] = []
             for component in device['components']:
                 filtered_component = {'id': component['id'], 'label': component['label'], 'categories': []}
-                for category in component['categories']:
-                    filtered_category = {'name': category['name']}
+                for _category in component['categories']:
+                    filtered_category = {'name': _category['name']}
                     filtered_component['categories'].append(filtered_category)
 
                 filtered_component['capabilities'] = []
-                for capability in component['capabilities']:
-                    if '.' in capability['id'] or capability['id'] in IGNORE_CAPABILITIES:
+                for _capability in component['capabilities']:
+                    if '.' in _capability['id'] or _capability['id'] in IGNORE_CAPABILITIES:
                         continue
-                    filtered_capability = {'id': capability['id']}
-                    if 'status' in capability:
+                    filtered_capability = {'id': _capability['id']}
+                    if 'status' in _capability:
                         filtered_capability['status'] = {}
-                        for (k, v) in capability['status'].items():
+                        for (k, v) in _capability['status'].items():
                             if k.startswith('supported') or k in {'numberOfButtons', ''}:
                                 continue
                             filtered_capability['status'][k] = {}
