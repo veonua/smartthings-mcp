@@ -2,6 +2,7 @@ import os
 import sys
 import uuid
 import datetime
+import math
 
 import pytest
 
@@ -9,8 +10,7 @@ from src.st.history import EventHistoryItem, EventHistoryResponse
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-
-from src.api import Command, Location
+from src.api import Command, Location, _bucket_time, _aggregate_values
 
 noRoomId = uuid.UUID("00000000-0000-0000-0000-000000000000")
 room1Id = uuid.UUID("00000000-0000-0000-0000-000000000001")
@@ -118,3 +118,89 @@ def test_validate_device_id():
     with pytest.raises(ValueError):
         loc.validate_device_id(uuid.UUID("22222222-2222-2222-2222-222222222222"))
 
+
+def test_bucket_time():
+    ts = datetime.datetime(2025, 6, 15, 12, 34, 56)
+    assert _bucket_time(ts, "realtime") == ts
+    assert _bucket_time(ts, "5min") == ts.replace(minute=30, second=0, microsecond=0)
+    assert _bucket_time(ts, "hourly") == ts.replace(minute=0, second=0, microsecond=0)
+    assert _bucket_time(ts, "daily") == ts.replace(hour=0, minute=0, second=0, microsecond=0)
+    with pytest.raises(ValueError):
+        _bucket_time(ts, "bogus")
+
+
+def test_aggregate_values():
+    values = [1, 2, 3]
+    assert _aggregate_values(values, "sum") == 6
+    assert _aggregate_values(values, "avg") == 2
+    assert _aggregate_values(values, "min") == 1
+    assert _aggregate_values(values, "max") == 3
+    assert math.isnan(_aggregate_values([], "avg"))
+    with pytest.raises(ValueError):
+        _aggregate_values(values, "bogus")
+
+
+def test_room_history_raw(monkeypatch):
+    loc = _make_location()
+    loc.get_devices_short = lambda **kwargs: [
+        {"deviceId": "dev1"},
+        {"deviceId": "dev2"},
+    ]
+    base = datetime.datetime(2025, 1, 1, 12, 0, 0)
+    events = {
+        "dev1": [{"time": base, "value": 1}],
+        "dev2": [{"time": base + datetime.timedelta(minutes=3), "value": 2}],
+    }
+
+    def fake_event_history(device_id, *args, **kwargs):
+        return events[device_id]
+
+    loc.event_history = fake_event_history
+
+    res = loc.room_history(
+        room_id=room1Id,
+        attribute="temperature",
+        start_ms=0,
+        end_ms=0,
+        granularity="realtime",
+        aggregate="raw",
+    )
+    assert res == [
+        {"time": base, "value": 1.0},
+        {"time": base + datetime.timedelta(minutes=3), "value": 2.0},
+    ]
+
+
+def test_room_history_bucket_avg(monkeypatch):
+    loc = _make_location()
+    loc.get_devices_short = lambda **kwargs: [
+        {"deviceId": "dev1"},
+        {"deviceId": "dev2"},
+    ]
+    base = datetime.datetime(2025, 1, 1, 12, 0, 0)
+    events = {
+        "dev1": [
+            {"time": base + datetime.timedelta(minutes=1), "value": 10},
+            {"time": base + datetime.timedelta(minutes=4), "value": 20},
+        ],
+        "dev2": [
+            {"time": base + datetime.timedelta(minutes=3), "value": 30},
+        ],
+    }
+
+    def fake_event_history(device_id, *args, **kwargs):
+        return events[device_id]
+
+    loc.event_history = fake_event_history
+
+    res = loc.room_history(
+        room_id=room1Id,
+        attribute="temperature",
+        start_ms=0,
+        end_ms=0,
+        granularity="5min",
+        aggregate="avg",
+    )
+    assert res == [
+        {"time": base, "value": pytest.approx(20.0)},
+    ]

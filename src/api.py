@@ -1,7 +1,8 @@
 import logging
 from functools import cached_property
-from typing import List, Protocol
+from typing import List, Protocol, Dict
 from uuid import UUID
+from datetime import datetime
 
 
 from st.history import EventHistoryResponse
@@ -327,3 +328,83 @@ class Location(ILocation):
         """Execute SmartThings commands on a device."""
         device_id = self.validate_device_id(device_id)
         return self._device_commands(device_id, commands)
+
+    def room_history(
+        self,
+        room_id: UUID,
+        attribute: Attribute,
+        start_ms: int,
+        end_ms: int,
+        granularity: str,
+        aggregate: str,
+    ) -> List[dict]:
+        """Aggregate history across all devices in a room."""
+        devices = self.get_devices_short(
+            room_id=room_id,
+            include_health=False,
+            include_status=False,
+        )
+
+        events: List[dict] = []
+        for d in devices:
+            events.extend(
+                self.event_history(
+                    device_id=d["deviceId"],
+                    attribute=attribute,
+                    limit=500,
+                    paging_after_epoch=start_ms,
+                    paging_before_epoch=end_ms,
+                )
+            )
+
+        if aggregate == "raw" and granularity == "realtime":
+            return sorted(events, key=lambda e: e["time"])
+
+        buckets: Dict[datetime, List[float]] = {}
+        for ev in events:
+            bucket = _bucket_time(ev["time"], granularity)
+            try:
+                val = float(ev["value"])
+            except (TypeError, ValueError):
+                continue
+            buckets.setdefault(bucket, []).append(val)
+
+        result = []
+        for ts, vals in sorted(buckets.items()):
+            if aggregate == "raw":
+                for v in vals:
+                    result.append({"time": ts, "value": v})
+            else:
+                agg_value = _aggregate_values(vals, aggregate)
+                result.append({"time": ts, "value": agg_value})
+
+        return result
+
+
+def _bucket_time(ts: datetime, granularity: str) -> datetime:
+    """Round a timestamp down to the given granularity."""
+    if granularity == "realtime":
+        return ts
+    if granularity == "5min":
+        return ts.replace(minute=(ts.minute // 5) * 5, second=0, microsecond=0)
+    if granularity == "hourly":
+        return ts.replace(minute=0, second=0, microsecond=0)
+    if granularity == "daily":
+        return ts.replace(hour=0, minute=0, second=0, microsecond=0)
+    raise ValueError(f"Unknown granularity: {granularity}")
+
+
+def _aggregate_values(values: List[float], agg: str) -> float:
+    """Aggregate numeric values according to agg method."""
+    if not values:
+        return float("nan")
+    if agg == "sum":
+        return float(sum(values))
+    if agg == "avg":
+        return float(sum(values) / len(values))
+    if agg == "min":
+        return float(min(values))
+    if agg == "max":
+        return float(max(values))
+    raise ValueError(f"Unknown aggregation: {agg}")
+
