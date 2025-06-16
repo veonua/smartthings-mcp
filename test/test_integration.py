@@ -45,6 +45,16 @@ def test_room_history():
     assert "time" in history[0]
 
 
+def test_history_p30d():
+    loc = _get_location()
+    devices = loc.get_devices_short()
+    if not devices:
+        pytest.skip("no devices available")
+    first_device_id = devices[0]["deviceId"]
+    history = loc.history(device_id=first_device_id, attribute="temperature", delta_start="P30D")
+    assert history, "empty history for P30D"
+
+
 missing_attributes = {
     'temperatureRange',  'heatingSetpointRange', 'coolingSetpointRange', 
     'quantity', 'type', # battery 

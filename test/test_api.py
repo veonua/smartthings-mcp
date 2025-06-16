@@ -203,3 +203,59 @@ def test_room_history_bucket_avg(monkeypatch):
     assert res == [
         {"time": base, "value": pytest.approx(20.0)},
     ]
+
+
+def test_calc_epoch_range(monkeypatch):
+    loc = _make_location()
+    loc.timezone = datetime.timezone.utc
+
+    fake_now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+
+    class FakeDateTime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fake_now
+
+    import src.api as api_mod
+    monkeypatch.setattr(api_mod, "datetime", FakeDateTime)
+
+    start_ms, end_ms = loc._calc_epoch_range("P1D")
+
+    assert start_ms == int((fake_now - datetime.timedelta(days=1)).timestamp() * 1000)
+    assert end_ms == int(fake_now.timestamp() * 1000)
+
+
+def test_history_calls_event(monkeypatch):
+    loc = _make_location()
+    loc.timezone = datetime.timezone.utc
+
+    captured = {}
+
+    def fake_event_history(*, device_id=None, attribute=None, limit=None,
+                           paging_after_epoch=None, paging_before_epoch=None, **kwargs):
+        captured["device_id"] = device_id
+        captured["paging_after_epoch"] = paging_after_epoch
+        captured["paging_before_epoch"] = paging_before_epoch
+        return []
+
+    loc.event_history = fake_event_history  # type: ignore
+
+    fake_now = datetime.datetime(2025, 1, 2, 0, 0, 0, tzinfo=datetime.timezone.utc)
+
+    class FakeDateTime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fake_now
+
+    import src.api as api_mod
+    monkeypatch.setattr(api_mod, "datetime", FakeDateTime)
+
+    dev_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    loc.history(device_id=dev_id, attribute="temperature", delta_start="P1D")
+
+    expected_start = int((fake_now - datetime.timedelta(days=1)).timestamp() * 1000)
+    expected_end = int(fake_now.timestamp() * 1000)
+
+    assert captured["device_id"] == dev_id
+    assert captured["paging_after_epoch"] == expected_start
+    assert captured["paging_before_epoch"] == expected_end

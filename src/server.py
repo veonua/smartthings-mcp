@@ -95,38 +95,14 @@ def get_device_history(
     • If `delta_end` is not provided, it defaults to now.
 
     """
-    import time    
-    import isodate
-
-    epoch_time = int(time.time())
-
-    start_delta = isodate.parse_duration(delta_start)
-    start_s = epoch_time - int(start_delta.total_seconds())
-    
-    end_s = epoch_time
-    if delta_end is not None:
-        end_delta = isodate.parse_duration(delta_end)
-        end_s = epoch_time - int(end_delta.total_seconds())
-
-    start_ms = start_s * 1000  # Convert to milliseconds
-    end_ms = end_s * 1000
-
-    if room_id is not None:
-        return location.room_history(
-            room_id=room_id,
-            attribute=attribute,
-            start_ms=start_ms,
-            end_ms=end_ms,
-            granularity=granularity,
-            aggregate=aggregate,
-        )
-
-    return location.event_history(
+    return location.history(
         device_id=device_id,
+        room_id=room_id,
         attribute=attribute,
-        limit=500,
-        #paging_after_epoch=start_ms,
-        #paging_before_epoch=end_ms,
+        delta_start=delta_start,
+        delta_end=delta_end,
+        granularity=granularity,
+        aggregate=aggregate,
     )
 
 @mcp.tool(description="Get hub time")

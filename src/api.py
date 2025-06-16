@@ -8,7 +8,15 @@ from datetime import datetime
 from st.device import DeviceItem, DeviceResponse, DeviceStatusResponse, StatusModel
 from st.history import EventHistoryResponse
 from st.command import Command
-from st.literals import Aggregate, Attribute, CapabilitiesMode, Capability, ComponentCategory, ConnectionType, Granularity
+from st.literals import (
+    Aggregate,
+    Attribute,
+    CapabilitiesMode,
+    Capability,
+    ComponentCategory,
+    ConnectionType,
+    Granularity,
+)
 from custom_session import CustomSession
 
 logger = logging.getLogger(__name__)
@@ -377,6 +385,52 @@ class Location(ILocation):
                 result.append({"time": ts, "value": agg_value})
 
         return result
+
+    def _calc_epoch_range(self, delta_start: str, delta_end: str | None = None) -> tuple[int, int]:
+        """Calculate epoch millisecond range from ISO8601 durations."""
+        import isodate
+
+        now = datetime.now(self.timezone)
+        start_delta = isodate.parse_duration(delta_start)
+        start_time = now - start_delta
+        if delta_end is not None:
+            end_delta = isodate.parse_duration(delta_end)
+            end_time = now - end_delta
+        else:
+            end_time = now
+
+        return int(start_time.timestamp() * 1000), int(end_time.timestamp() * 1000)
+
+    def history(
+        self,
+        *,
+        device_id: UUID | None = None,
+        room_id: UUID | None = None,
+        attribute: Attribute,
+        delta_start: str,
+        delta_end: str | None = None,
+        granularity: Granularity = "hourly",
+        aggregate: Aggregate = "raw",
+    ) -> List[dict]:
+        """Fetch history for a device or room using ISO durations."""
+        start_ms, end_ms = self._calc_epoch_range(delta_start, delta_end)
+        if room_id is not None:
+            return self.room_history(
+                room_id=room_id,
+                attribute=attribute,
+                start_ms=start_ms,
+                end_ms=end_ms,
+                granularity=granularity,
+                aggregate=aggregate,
+            )
+
+        return self.event_history(
+            device_id=device_id,
+            attribute=attribute,
+            limit=500,
+            paging_after_epoch=start_ms,
+            paging_before_epoch=end_ms,
+        )
 
 
 def _bucket_time(ts: datetime, granularity: Granularity = "realtime") -> datetime:
