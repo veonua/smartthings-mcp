@@ -6,10 +6,9 @@ import math
 
 import pytest
 
-from src.st.device import DeviceItem
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
+from src.st.device import DeviceItem
 from src.api import Command, Location, _bucket_time, _aggregate_values
 
 noRoomId = uuid.UUID("00000000-0000-0000-0000-000000000000")
