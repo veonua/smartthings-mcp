@@ -43,3 +43,15 @@ def test_room_history():
     history = loc.room_history(room_id=first_room_id)
     assert len(history) > 0
     assert "time" in history[0]
+
+
+def test_device_status():
+    loc = _get_location()
+    devices = loc.get_devices_short()
+    if not devices:
+        pytest.skip("no devices available")
+    for dev in devices:
+        status = loc.device_status(dev["deviceId"])
+        assert isinstance(status, dict)
+        assert status, "no status returned"
+        assert "main" in status
