@@ -23,8 +23,8 @@ from typing import Optional, Union
 from pydantic import BaseModel, Field
 from uuid import UUID
 
-from src.st.links import Links
-from .literals import Attribute, Capability
+from st.links import Links
+from st.literals import Attribute, Capability
 
 class EventHistoryItem(BaseModel):
     device_id: UUID = Field(..., alias="deviceId")

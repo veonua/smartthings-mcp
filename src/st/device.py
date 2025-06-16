@@ -42,8 +42,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-from src.st.links import Links
-from src.st.literals import Attribute, Capability, ComponentCategory, ConnectionType, ExecutionContext
+from st.links import Links
+from st.literals import Attribute, Capability, ComponentCategory, ConnectionType, ExecutionContext
 
 class StatusModel(BaseModel):
     value: Any
