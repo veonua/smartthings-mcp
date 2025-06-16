@@ -1,11 +1,11 @@
 import logging
 from functools import cached_property
-from typing import Any, List, Protocol, Dict
+from typing import Any, List, Protocol, Dict, Union
 from uuid import UUID
 from datetime import datetime
 
 
-from src.st.device import DeviceItem, DeviceResponse
+from st.device import DeviceItem, DeviceResponse, DeviceStatusResponse, StatusModel
 from st.history import EventHistoryResponse
 from st.command import Command
 from st.literals import Aggregate, Attribute, CapabilitiesMode, Capability, ComponentCategory, ConnectionType, Granularity
@@ -19,7 +19,7 @@ IGNORE_CAPABILITIES = {'mediaPresets', 'firmwareUpdate', 'healthCheck', 'threeAx
 
 
 class ILocation(Protocol): 
-    def device_status(self, device_id: UUID) -> dict: 
+    def device_status(self, device_id: UUID) -> dict[str, dict[Union[Capability, str], dict[Union[Attribute, str], StatusModel]]]:
         ...
 
     def event_history(self, device_id: UUID | None = None, limit: int = 500,
@@ -77,13 +77,13 @@ class Location(ILocation):
     def _location(self):
         return self.session.get_json(f"v1/locations/{self.location_id}")
 
-    def _device_status(self, device_id: UUID) -> dict:
-        return self.session.get_json(f"devices/{device_id}/status")['components']
+    def _device_status(self, device_id: UUID) -> DeviceStatusResponse:
+        return DeviceStatusResponse.model_validate(self.session.get_json(f"v1/devices/{device_id}/status"))
 
-    def device_status(self, device_id: UUID) -> dict:
+    def device_status(self, device_id: UUID) -> dict[str, dict[Union[Capability, str], dict[Union[Attribute, str], StatusModel]]]:
         device_id = self.validate_device_id(device_id)
         status = self._device_status(device_id)
-        return status
+        return status.components
 
     def event_history(self, device_id: UUID | None = None, limit: int = 500,
                       capability: Capability | None = None,
@@ -154,7 +154,7 @@ class Location(ILocation):
     def device_ids(self) -> set[UUID]:
         """Set of device UUIDs available in this location."""
         devices = self.get_devices_short(include_status=False)
-        return {UUID(d['deviceId']) for d in devices}
+        return {d['deviceId'] for d in devices}
 
     def validate_device_id(self, device_id: UUID) -> UUID:
         """Validate that a device ID exists in the location.
@@ -262,11 +262,11 @@ class Location(ILocation):
                             if k.startswith('supported') or k in {'numberOfButtons', ''}:
                                 continue
                             filtered_capability['status'][k] = {}
-                            filtered_capability['status'][k]['value'] = v['value']
-                            if v.get('unit') is not None:
-                                filtered_capability['status'][k]['unit'] = v.get('unit')
-                            if v.get('timestamp') is not None:
-                                filtered_capability['status'][k]['timestamp'] = v.get('timestamp')
+                            filtered_capability['status'][k]['value'] = v.value
+                            if v.unit is not None:
+                                filtered_capability['status'][k]['unit'] = v.unit
+                            if v.timestamp is not None:
+                                filtered_capability['status'][k]['timestamp'] = v.timestamp
                     filtered_component['capabilities'].append(filtered_capability)
                 filtered_device['components'].append(filtered_component)
             

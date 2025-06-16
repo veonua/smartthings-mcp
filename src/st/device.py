@@ -43,14 +43,19 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from src.st.links import Links
-from src.st.literals import Capability, ComponentCategory, ConnectionType, ExecutionContext
+from src.st.literals import Attribute, Capability, ComponentCategory, ConnectionType, ExecutionContext
+
+class StatusModel(BaseModel):
+    value: Any
+    unit: Optional[str] = None
+    timestamp: Optional[datetime] = None
 
 class CapabilityModel(BaseModel):
     id: Union[Capability, str]  # Capability can be a string or a specific enum type
     version: int = 1
-    optional: bool = False  
-    status: Optional[dict[str, Any]] = None
-    
+    optional: bool = False
+    status: Optional[dict[str, StatusModel]] = None
+
 class CategoryModel(BaseModel):
     name: Union[ComponentCategory, str]  # Category can be a string or a specific enum type
     category_type: Literal["manufacturer", "user"] = Field(..., alias="categoryType")
@@ -97,3 +102,7 @@ class DeviceResponse(BaseModel):
             "items": [item.model_dump(by_alias=True) for item in self.items],
             "_links": self.links if self.links else None
         }
+    
+
+class DeviceStatusResponse(BaseModel):
+    components: dict[str, dict[Union[Capability, str], dict[Union[Attribute, str], StatusModel]]]

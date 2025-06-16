@@ -45,13 +45,54 @@ def test_room_history():
     assert "time" in history[0]
 
 
-def test_device_status():
+missing_attributes = {
+    'temperatureRange',  'heatingSetpointRange', 'coolingSetpointRange', 
+    'quantity', 'type', # battery 
+    'availableFanOscillationModes',
+    'numberOfButtons', # button
+    'levelRange', 'colorTemperatureRange', # switchLevel
+    'driverVersion', 'fade', 'circadian',
+    'commandResult', # lock
+    
+}
+
+missing_capabilities = {'firmwareUpdate', 'bridge', 'healthCheck'}
+
+def test_get_devices_with_status():
     loc = _get_location()
-    devices = loc.get_devices_short()
+    devices = loc.get_devices(include_status=True)
     if not devices:
         pytest.skip("no devices available")
     for dev in devices:
-        status = loc.device_status(dev["deviceId"])
-        assert isinstance(status, dict)
-        assert status, "no status returned"
-        assert "main" in status
+        for component in dev.components:
+            for capability in component.capabilities:
+                if capability.id in missing_capabilities:
+                    continue
+
+                if capability.status is None:
+                    pytest.fail(f"Capability {capability.id} has no status for device {dev.device_id}")
+                
+                for (attribute, status) in capability.status.items():
+                    if attribute in missing_attributes or attribute.startswith("supported") or attribute.startswith("available"):
+                        continue
+                    if status.value is None:
+                        print(f"Status value is None for capability {capability.id}/{attribute} in device {dev.device_id}")
+
+
+def test_get_status_by_device_by_id():
+    loc = _get_location()
+    devices = loc.get_devices(include_status=True)
+    if not devices:
+        pytest.skip("no devices available")
+    dev = devices.pop()
+    status_dict = loc.device_status(dev.device_id)
+    assert status_dict is not None, f"No status returned for device {dev.device_id}"
+    for (comp_name, component_value) in status_dict.items():
+        for (capability_id, capability_value) in component_value.items():
+            if capability_value is None:
+                pytest.fail(f"Capability {capability_id} has no status for device {dev.device_id}")
+
+            for (attribute, status) in capability_value.items():
+                if attribute in missing_attributes or attribute.startswith("supported") or attribute.startswith("available"):
+                    continue
+                assert status.value is not None, f"Status value is None for capability {capability_id}/{attribute} in device {dev.device_id}"
