@@ -69,14 +69,14 @@ def execute_commands(device_id: UUID, commands: List[Command]):
     return location.device_commands(device_id, commands)
 
 
-@mcp.tool(description="Answer questions about past values or trends")
+@mcp.tool(description="Answer questions about past values or trends. Use ISO8601 Duration for `delta_start` and `delta_end` (e.g. P1D for 1 day, PT1H for 1 hour).")
 def get_device_history(
     *,
     device_id: Optional[UUID] = None,
     room_id:   Optional[UUID] = None,
     attribute: Attribute,
-    start: datetime,
-    end: datetime,
+    delta_start: str,
+    delta_end: str | None = None,
     granularity: Literal["realtime", "5min", "hourly", "daily"] = "hourly",
     aggregate:   Literal["raw", "sum", "avg", "min", "max"]   = "raw",
 ) -> List[dict]:
@@ -91,26 +91,18 @@ def get_device_history(
     • `metric` must match a path from *Get Device Status*  
       (e.g. "powerMeter.power", "temperature.value").  
     • Cap the returned set to ≲500 points; raise `granularity` as needed.
+    • Use ISO8601 Duration for `delta_start` and `delta_end` (e.g. "P1D" for 1 day, "PT1H" for 1 hour).
+    • If `delta_end` is not provided, it defaults to now.
+
     """
-    start_ms = int(start.timestamp() * 1000)
-    end_ms = int(end.timestamp() * 1000)
-
-    if room_id is not None:
-        return location.room_history(
-            room_id=room_id,
-            attribute=attribute,
-            start_ms=start_ms,
-            end_ms=end_ms,
-            granularity=granularity,
-            aggregate=aggregate,
-        )
-
-    return location.event_history(
+    return location.history(
         device_id=device_id,
+        room_id=room_id,
         attribute=attribute,
-        limit=500,
-        paging_after_epoch=start_ms,
-        paging_before_epoch=end_ms,
+        delta_start=delta_start,
+        delta_end=delta_end,
+        granularity=granularity,
+        aggregate=aggregate,
     )
 
 @mcp.tool(description="Get hub time")
