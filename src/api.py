@@ -273,8 +273,8 @@ class Location(ILocation):
                             filtered_capability['status'][k]['value'] = v.value
                             if v.unit is not None:
                                 filtered_capability['status'][k]['unit'] = v.unit
-                            if v.timestamp is not None:
-                                filtered_capability['status'][k]['timestamp'] = v.timestamp
+                            #if v.timestamp is not None: timestaps are off
+                            #    filtered_capability['status'][k]['timestamp'] = v.timestamp
                     filtered_component['capabilities'].append(filtered_capability)
                 filtered_device['components'].append(filtered_component)
             
