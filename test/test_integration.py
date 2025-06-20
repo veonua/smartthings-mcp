@@ -106,3 +106,72 @@ def test_get_status_by_device_by_id():
                 if attribute in missing_attributes or attribute.startswith("supported") or attribute.startswith("available"):
                     continue
                 assert status.value is not None, f"Status value is None for capability {capability_id}/{attribute} in device {dev.device_id}"
+
+
+def test_history_hourly_avg_device():
+    loc = _get_location()
+    devices = loc.get_devices(include_status=True)
+    if not devices:
+        pytest.skip("no devices available")
+
+    dev_id = None
+    for dev in devices:
+        for comp in dev.components:
+            for cap in comp.capabilities:
+                if cap.status and "temperature" in cap.status:
+                    dev_id = dev.device_id
+                    break
+            if dev_id:
+                break
+        if dev_id:
+            break
+
+    if dev_id is None:
+        pytest.skip("no temperature capable device found")
+
+    history = loc.history(
+        device_id=dev_id,
+        attribute="temperature",
+        delta_start="PT6H",
+        granularity="hourly",
+        aggregate="avg",
+    )
+
+    if not history:
+        pytest.skip("empty history")
+
+    for item in history:
+        assert item["time"].minute == 0
+        assert item["time"].second == 0
+        assert item["time"].microsecond == 0
+
+
+@pytest.mark.parametrize("granularity", ["5min", "hourly", "daily"])
+def test_history_room_avg_granularity(granularity: str):
+    loc = _get_location()
+    rooms = loc.rooms
+    if not rooms:
+        pytest.skip("no rooms available")
+
+    first_room_id = next(iter(rooms.keys()))
+    history = loc.history(
+        room_id=first_room_id,
+        attribute="temperature",
+        delta_start="PT6H",
+        granularity=granularity,
+        aggregate="avg",
+    )
+
+    if not history:
+        pytest.skip("empty history")
+
+    for item in history:
+        if granularity == "5min":
+            assert item["time"].minute % 5 == 0
+        elif granularity == "hourly":
+            assert item["time"].minute == 0
+        elif granularity == "daily":
+            assert item["time"].hour == 0
+            assert item["time"].minute == 0
+        assert item["time"].second == 0
+        assert item["time"].microsecond == 0
