@@ -3,6 +3,7 @@ from os import environ
 from typing import List, Literal, Optional
 from uuid import UUID
 import logging
+from mcp.types  import ToolAnnotations
 
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
@@ -33,15 +34,38 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("SmartThings", port=8001)
 
 
-@mcp.tool(description="Get rooms UUID and names")
+@mcp.tool(description="Get rooms UUID and names", annotations=ToolAnnotations(
+    title="Get Smart Home Rooms",
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False)
+)
 def get_rooms() -> dict[UUID, str]:
     return location.rooms
 
 
-@mcp.tool(description="Get devices")
+@mcp.tool(description="""
+Retrieve devices based on specified filtering criteria.
+
+Parameters:
+- capability: Optional list of capabilities that devices must have (e.g., ['switch', 'temperatureMeasurement']).
+- capabilities_mode: Defines how multiple capabilities are matched ('or' returns devices matching any capability, 'and' returns devices matching all specified capabilities). Default is 'or'.
+- include_restricted: Include restricted devices in the results. Default is False.
+- room_id: Filter devices by a specific room identifier.
+- include_status: Include device status information in the response. Default is True.
+- category: Filter devices by their component category.
+- connection_type: Filter devices by their connection type (e.g., Wi-Fi, Zigbee).
+""", annotations=ToolAnnotations(
+    title="Get Smart Home Devices",
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False)
+)
 def get_devices(
     capability: List[Capability] | None = None,
-    capabilities_mode: CapabilitiesMode | None = None,
+    capabilities_mode: CapabilitiesMode | None = 'or',
     include_restricted: bool = False,
     room_id: UUID | None = None,
     include_status: bool = True,
@@ -52,13 +76,25 @@ def get_devices(
     return location.get_devices_short(**locals())
 
 
-@mcp.tool(description="Get device status")
+@mcp.tool(description="Get device status", annotations=ToolAnnotations(
+    title="Get Device Status",
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False)
+)
 def get_device_status(device_id: UUID):
     logger.info(f"Getting status for device {device_id}")
     return location.device_status(device_id)
 
 
-@mcp.tool(description="Execute commands on a device")
+@mcp.tool(description="Execute commands on a device", annotations=ToolAnnotations(
+    title="Execute Device Commands",
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=False,
+    openWorldHint=False)
+)
 def execute_commands(device_id: UUID, commands: List[Command]):
     """Send SmartThings commands to a device.
     Hints:
@@ -69,7 +105,14 @@ def execute_commands(device_id: UUID, commands: List[Command]):
     return location.device_commands(device_id, commands)
 
 
-@mcp.tool(description="Answer questions about past values or trends. Use ISO8601 Duration for `delta_start` and `delta_end` (e.g. P1D for 1 day, PT1H for 1 hour).")
+@mcp.tool(description="Answer questions about past values or trends. Use ISO8601 Duration for `delta_start` and `delta_end` (e.g. P1D for 1 day, PT1H for 1 hour).",
+          annotations=ToolAnnotations(
+    title="Get Device History",
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False)
+    )
 def get_device_history(
     *,
     device_id: Optional[UUID] = None,
