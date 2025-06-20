@@ -222,3 +222,54 @@ def test_history_calls_event(monkeypatch):
     assert captured["device_id"] == dev_id
     assert captured["paging_after_epoch"] == expected_start
     assert captured["paging_before_epoch"] == expected_end
+
+
+def test_event_history_capability_filter(monkeypatch):
+    loc = _make_location()
+
+    base_time = datetime.datetime(2025, 1, 1, 12, 0, 0)
+    events_data = {
+        "items": [
+            {
+                "deviceId": "11111111-1111-1111-1111-111111111111",
+                "deviceName": "Device1",
+                "locationId": "22222222-2222-2222-2222-222222222222",
+                "locationName": "Home",
+                "time": base_time.isoformat() + "Z",
+                "text": "on",
+                "component": "main",
+                "componentLabel": "main",
+                "capability": "switch",
+                "attribute": "switch",
+                "value": "on",
+                "epoch": 1,
+                "hash": 1,
+            },
+            {
+                "deviceId": "33333333-3333-3333-3333-333333333333",
+                "deviceName": "Device2",
+                "locationId": "22222222-2222-2222-2222-222222222222",
+                "locationName": "Home",
+                "time": (base_time + datetime.timedelta(minutes=1)).isoformat() + "Z",
+                "text": "motion",
+                "component": "main",
+                "componentLabel": "main",
+                "capability": "motionSensor",
+                "attribute": "motion",
+                "value": "active",
+                "epoch": 2,
+                "hash": 2,
+            },
+        ]
+    }
+
+    class FakeSession:
+        def get_json(self, url):
+            return events_data
+
+    loc.session = FakeSession()
+
+    result = loc.event_history(capability={"switch"})
+
+    assert len(result) == 1
+    assert result[0]["capability"] == "switch"

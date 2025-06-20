@@ -131,7 +131,7 @@ class Location(ILocation):
         # Filter items without pandas
         filtered_items = []
         for item in events.items:
-            if capability is not None and item.capability in capability:
+            if capability is not None and item.capability not in capability:
                 continue
             if attribute is not None and item.attribute != attribute:
                 continue
