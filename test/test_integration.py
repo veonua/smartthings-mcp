@@ -1,12 +1,13 @@
 import os
 import pytest
 import dotenv
+from uuid import UUID
 
 
 from src.api import Location, Granularity
 
 dotenv.load_dotenv()
-TOKEN = os.getenv("TOKEN", "def1b90b-f15a-4061-a2b7-116e7d9028cc")
+TOKEN = os.getenv("TOKEN")
 
 pytestmark = pytest.mark.skipif(not TOKEN, reason="TOKEN environment variable not set")
 
@@ -183,3 +184,13 @@ def test_history_room_avg_granularity(granularity: Granularity):
             assert item["time"].minute == 0
         assert item["time"].second == 0
         assert item["time"].microsecond == 0
+
+
+def test_motion_history():
+    loc = _get_location()
+
+    history = loc.history(device_id=UUID("e4c44ca3-14f4-41c8-acc4-afbf1ad7442e"), attribute= "motion", delta_start= "P5D",
+  granularity= "hourly", aggregate= "raw")
+    assert history, "empty history for PT6H"
+    assert isinstance(history[0]["time"], str)  # Ensure time is a string
+    assert "temperature" in history[0]  # Ensure temperature is in the history item

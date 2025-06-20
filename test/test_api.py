@@ -160,9 +160,7 @@ def test_room_history_raw(monkeypatch):
         room_id=room1Id,
         attribute="temperature",
         start_ms=0,
-        end_ms=0,
-        granularity="realtime",
-        aggregate="raw",
+        end_ms=0
     )
     assert res == [
         {"time": base, "value": 1.0},

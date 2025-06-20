@@ -1,6 +1,6 @@
 import logging
 from functools import cached_property
-from typing import Any, List, Protocol, Dict, Union
+from typing import Any, List, Protocol, Dict, Union, Set
 from uuid import UUID
 from datetime import datetime
 
@@ -31,7 +31,8 @@ class ILocation(Protocol):
         ...
 
     def event_history(self, device_id: UUID | None = None, limit: int = 500,
-                      capability: Capability | None = None,
+                      capability: Set[Capability] | None = None,
+                      capability_mode: CapabilitiesMode | None = "or",
                       attribute: Attribute | None = None,
                       oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
                       paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> List[dict]:
@@ -39,20 +40,20 @@ class ILocation(Protocol):
 
     @cached_property
     def rooms(self) -> dict[UUID, str]:
-        """Get rooms UUID and names."""
+        """Get room UUID and names."""
         ...
 
     def get_room_name(self, room_id: UUID) -> str:
         ...
 
-    def get_devices(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
+    def get_devices(self, capability: Set[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                     include_restricted: bool = False,
                     room_id: UUID | None = None, include_status: bool = True,
                     category: ComponentCategory | None = None,
                     connection_type: ConnectionType | None = None) -> List[DeviceItem]:
         ...
 
-    def get_devices_short(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
+    def get_devices_short(self, capability: Set[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                           include_restricted: bool = False,
                           room_id: UUID | None = None, include_status: bool = True,
                           category: ComponentCategory | None = None,
@@ -94,7 +95,8 @@ class Location(ILocation):
         return status.components
 
     def event_history(self, device_id: UUID | None = None, limit: int = 500,
-                      capability: Capability | None = None,
+                      capability: Set[Capability] | None = None,
+                      capability_mode: CapabilitiesMode | None = "or",
                       attribute: Attribute | None = None,
                       oldest_first: bool = False, paging_after_epoch: int | None = None, paging_after_hash: int | None = None,
                       paging_before_epoch: int | None = None, paging_before_hash: int | None = None) -> List[dict]:
@@ -129,7 +131,7 @@ class Location(ILocation):
         # Filter items without pandas
         filtered_items = []
         for item in events.items:
-            if capability is not None and item.capability != capability:
+            if capability is not None and item.capability in capability:
                 continue
             if attribute is not None and item.attribute != attribute:
                 continue
@@ -196,7 +198,7 @@ class Location(ILocation):
     def _get_devices(self, url: str):
         return DeviceResponse.model_validate(self.session.get_json(url)).items
 
-    def get_devices(self, capability: List[Capability] | Capability | None = None, capabilities_mode: CapabilitiesMode | None = None,
+    def get_devices(self, capability: Set[Capability] | Capability | None = None, capabilities_mode: CapabilitiesMode | None = None,
                     include_restricted: bool = False,
                     room_id: UUID | None = None, include_status: bool = True,
                     category: ComponentCategory | None = None,
@@ -238,7 +240,7 @@ class Location(ILocation):
 
         return self._get_devices(url)
 
-    def get_devices_short(self, capability: List[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
+    def get_devices_short(self, capability: Set[Capability] | None = None, capabilities_mode: CapabilitiesMode | None = None,
                           include_restricted: bool = False,
                           room_id: UUID | None = None, include_status: bool = True,
                           category: ComponentCategory | None = None,
@@ -296,28 +298,9 @@ class Location(ILocation):
                 continue
             return k, v['value'], v.get('unit'), v.get('timestamp')
 
-    # def devices_df(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    #     _devices = self.get_devices_short()
-
-    #     d = [(device['deviceId'], device['components'][0]['categories'][-1]['name'], device['label'],
-    #           # device['manufacturerName'],  device.get('deviceManufacturerCode'), device['locationId'], device['presentationId'],device['profile']['id'],  device.get('restrictionTier')
-    #           device.get('roomId'), device['createTime'], device.get('parentDeviceId'), device['type']
-    #           ) for device in _devices]
-
-    #     c = [(device['deviceId'], component['id'], capability['id'], *self.get_status(capability.get('status'))) for
-    #          device in _devices for component in device['components'] for capability in component['capabilities']]
-
-    #     devices_df = pd.DataFrame(d, columns=['deviceId', 'category', 'name', 'roomId', 'createTime', 'parentDeviceId',
-    #                                           'type'])  # .set_index('deviceId')
-    #     rooms = self.rooms
-    #     devices_df['room'] = devices_df['roomId'].map(lambda x: rooms.get(x, str(x)))
-    #     devices_df.drop(columns=['roomId'], inplace=True)
-    #     capabilities_df = pd.DataFrame(c, columns=['deviceId', 'component', 'capability', 'attribute', 'value', 'unit',
-    #                                                'timestamp'])
-    #     return devices_df, capabilities_df
 
     def _device_commands(self, device_id: UUID, commands: list[Command]) -> dict:
-        """Low level API call to execute commands on a device.
+        """Low-level API call to execute commands on a device.
         {
           "results": [
             {
@@ -342,8 +325,6 @@ class Location(ILocation):
         attribute: Attribute | None = None,
         start_ms: int | None = None,
         end_ms: int | None = None,
-        granularity: Granularity = "realtime",
-        aggregate: Aggregate = "raw",
     ) -> List[dict]:
         """Aggregate history across all devices in a room."""
         devices = self.get_devices_short(
@@ -382,12 +363,11 @@ class Location(ILocation):
 
     def history(
         self,
-        *,
-        device_id: UUID | None = None,
-        room_id: UUID | None = None,
-        attribute: Attribute,
         delta_start: str,
         delta_end: str | None = None,
+        device_id: UUID | None = None,
+        room_id: UUID | None = None,
+        attribute: Attribute | None = None,
         granularity: Granularity = "hourly",
         aggregate: Aggregate = "raw",
     ) -> List[dict]:
@@ -399,17 +379,15 @@ class Location(ILocation):
                 attribute=attribute,
                 start_ms=start_ms,
                 end_ms=end_ms,
-                granularity=granularity,
-                aggregate=aggregate,
             )
-
-        events = self.event_history(
-            device_id=device_id,
-            attribute=attribute,
-            limit=500,
-            paging_after_epoch=start_ms,
-            paging_before_epoch=end_ms,
-        )
+        else:
+            events = self.event_history(
+                device_id=device_id,
+                attribute=attribute,
+                limit=500,
+                paging_after_epoch=start_ms,
+                paging_before_epoch=end_ms,
+            )
 
         if aggregate == "raw" and granularity == "realtime":
             return sorted(events, key=lambda e: e["time"])
