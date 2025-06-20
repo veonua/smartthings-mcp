@@ -2,10 +2,11 @@ import os
 import pytest
 import dotenv
 
-from src.api import Location
+
+from src.api import Location, Granularity
 
 dotenv.load_dotenv()
-TOKEN = os.getenv("TOKEN", "")
+TOKEN = os.getenv("TOKEN", "def1b90b-f15a-4061-a2b7-116e7d9028cc")
 
 pytestmark = pytest.mark.skipif(not TOKEN, reason="TOKEN environment variable not set")
 
@@ -85,8 +86,8 @@ def test_get_devices_with_status():
                 for (attribute, status) in capability.status.items():
                     if attribute in missing_attributes or attribute.startswith("supported") or attribute.startswith("available"):
                         continue
-                    if status.value is None:
-                        print(f"Status value is None for capability {capability.id}/{attribute} in device {dev.device_id}")
+                    #if status.value is None:
+                    #    pytest.warns(UserWarning, f"Status value is None for capability {capability.id}/{attribute} in device {dev.device_id}")
 
 
 def test_get_status_by_device_by_id():
@@ -108,7 +109,8 @@ def test_get_status_by_device_by_id():
                 assert status.value is not None, f"Status value is None for capability {capability_id}/{attribute} in device {dev.device_id}"
 
 
-def test_history_hourly_avg_device():
+@pytest.mark.parametrize("granularity", ["5min", "hourly", "daily"])
+def test_history_hourly_avg_device(granularity: Granularity):
     loc = _get_location()
     devices = loc.get_devices(include_status=True)
     if not devices:
@@ -133,25 +135,31 @@ def test_history_hourly_avg_device():
         device_id=dev_id,
         attribute="temperature",
         delta_start="PT6H",
-        granularity="hourly",
+        granularity=granularity,
         aggregate="avg",
     )
 
-    if not history:
-        pytest.skip("empty history")
+    #if not history:
+    #    pytest.skip("empty history")
 
     for item in history:
-        assert item["time"].minute == 0
+        if granularity == "5min":
+            assert item["time"].minute % 5 == 0
+        elif granularity == "hourly":
+            assert item["time"].minute == 0
+        elif granularity == "daily":
+            assert item["time"].hour == 0
+            assert item["time"].minute == 0
         assert item["time"].second == 0
         assert item["time"].microsecond == 0
 
 
 @pytest.mark.parametrize("granularity", ["5min", "hourly", "daily"])
-def test_history_room_avg_granularity(granularity: str):
+def test_history_room_avg_granularity(granularity: Granularity):
     loc = _get_location()
     rooms = loc.rooms
-    if not rooms:
-        pytest.skip("no rooms available")
+    #if not rooms:
+    #    pytest.skip("no rooms available")
 
     first_room_id = next(iter(rooms.keys()))
     history = loc.history(
@@ -162,8 +170,8 @@ def test_history_room_avg_granularity(granularity: str):
         aggregate="avg",
     )
 
-    if not history:
-        pytest.skip("empty history")
+    #if not history:
+    #    pytest.skip("empty history")
 
     for item in history:
         if granularity == "5min":

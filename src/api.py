@@ -363,28 +363,7 @@ class Location(ILocation):
                 )
             )
 
-        if aggregate == "raw" and granularity == "realtime":
-            return sorted(events, key=lambda e: e["time"])
-
-        buckets: Dict[datetime, List[float]] = {}
-        for ev in events:
-            bucket = _bucket_time(ev["time"], granularity)
-            try:
-                val = float(ev["value"])
-            except (TypeError, ValueError):
-                continue
-            buckets.setdefault(bucket, []).append(val)
-
-        result = []
-        for ts, vals in sorted(buckets.items()):
-            if aggregate == "raw":
-                for v in vals:
-                    result.append({"time": ts, "value": v})
-            else:
-                agg_value = _aggregate_values(vals, aggregate)
-                result.append({"time": ts, "value": agg_value})
-
-        return result
+        return events
 
     def _calc_epoch_range(self, delta_start: str, delta_end: str | None = None) -> tuple[int, int]:
         """Calculate epoch millisecond range from ISO8601 durations."""
@@ -415,7 +394,7 @@ class Location(ILocation):
         """Fetch history for a device or room using ISO durations."""
         start_ms, end_ms = self._calc_epoch_range(delta_start, delta_end)
         if room_id is not None:
-            return self.room_history(
+            events = self.room_history(
                 room_id=room_id,
                 attribute=attribute,
                 start_ms=start_ms,
@@ -424,13 +403,36 @@ class Location(ILocation):
                 aggregate=aggregate,
             )
 
-        return self.event_history(
+        events = self.event_history(
             device_id=device_id,
             attribute=attribute,
             limit=500,
             paging_after_epoch=start_ms,
             paging_before_epoch=end_ms,
         )
+
+        if aggregate == "raw" and granularity == "realtime":
+            return sorted(events, key=lambda e: e["time"])
+
+        buckets: Dict[datetime, List[float]] = {}
+        for ev in events:
+            bucket = _bucket_time(ev["time"], granularity)
+            try:
+                val = float(ev["value"])
+            except (TypeError, ValueError):
+                continue
+            buckets.setdefault(bucket, []).append(val)
+
+        result = []
+        for ts, vals in sorted(buckets.items()):
+            if aggregate == "raw":
+                for v in vals:
+                    result.append({"time": ts, "value": v})
+            else:
+                agg_value = _aggregate_values(vals, aggregate)
+                result.append({"time": ts, "value": agg_value})
+
+        return result
 
 
 def _bucket_time(ts: datetime, granularity: Granularity = "realtime") -> datetime:

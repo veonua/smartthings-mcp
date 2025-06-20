@@ -170,41 +170,6 @@ def test_room_history_raw(monkeypatch):
     ]
 
 
-def test_room_history_bucket_avg(monkeypatch):
-    loc = _make_location()
-    loc.get_devices_short = lambda **kwargs: [ # type: ignore
-        {"deviceId": "dev1"},
-        {"deviceId": "dev2"},
-    ]
-    base = datetime.datetime(2025, 1, 1, 12, 0, 0)
-    events = {
-        "dev1": [
-            {"time": base + datetime.timedelta(minutes=1), "value": 10},
-            {"time": base + datetime.timedelta(minutes=4), "value": 20},
-        ],
-        "dev2": [
-            {"time": base + datetime.timedelta(minutes=3), "value": 30},
-        ],
-    }
-
-    def fake_event_history(device_id, *args, **kwargs):
-        return events[device_id]
-
-    loc.event_history = fake_event_history # type: ignore
-
-    res = loc.room_history(
-        room_id=room1Id,
-        attribute="temperature",
-        start_ms=0,
-        end_ms=0,
-        granularity="5min",
-        aggregate="avg",
-    )
-    assert res == [
-        {"time": base, "value": pytest.approx(20.0)},
-    ]
-
-
 def test_calc_epoch_range(monkeypatch):
     loc = _make_location()
     loc.timezone = datetime.timezone.utc
