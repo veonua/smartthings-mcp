@@ -13,6 +13,8 @@ pytestmark = pytest.mark.skipif(not TOKEN, reason="TOKEN environment variable no
 
 
 def _get_location():
+    if TOKEN is None:
+        raise ValueError("TOKEN environment variable not set")
     return Location(TOKEN)
 
 

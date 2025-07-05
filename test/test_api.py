@@ -169,8 +169,9 @@ def test_room_history_raw(monkeypatch):
 
 
 def test_calc_epoch_range(monkeypatch):
+    import pytz
     loc = _make_location()
-    loc.timezone = datetime.timezone.utc
+    loc.timezone = pytz.UTC
 
     fake_now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
 
@@ -189,8 +190,9 @@ def test_calc_epoch_range(monkeypatch):
 
 
 def test_history_calls_event(monkeypatch):
+    import pytz
     loc = _make_location()
-    loc.timezone = datetime.timezone.utc
+    loc.timezone = pytz.UTC
 
     captured = {}
 
@@ -267,7 +269,7 @@ def test_event_history_capability_filter(monkeypatch):
         def get_json(self, url):
             return events_data
 
-    loc.session = FakeSession()
+    loc.session = FakeSession()  # type: ignore
 
     result = loc.event_history(capability={"switch"})
 
