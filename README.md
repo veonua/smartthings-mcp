@@ -9,7 +9,7 @@ This project provides a small [Model Context Protocol](https://github.com/smartt
     "command": "uv",
     "args": [
         "run",
-        "src/mcp_smartthings/server.py"
+        "src/server.py"
     ],
     "env": {
         "TOKEN": "Your Personal Token"
@@ -27,7 +27,7 @@ docker build -t smartthings-mcp .
 docker run -e TOKEN=<api token> smartthings-mcp
 ```
 
-The container installs the production dependencies using `uv` and launches the server with `uv run src/mcp_smartthings/server.py`.
+The container installs the production dependencies using `uv` and launches the server with `uv run src/server.py`.
 
 ## Available tools
 

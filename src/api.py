@@ -206,7 +206,7 @@ class Location(ILocation):
         url = f"devices?locationId={self.location_id}"
         if capability is not None:
             if isinstance(capability, str):
-                capability = [capability]
+                capability = {capability}
             for c in capability:
                 if c == 'humidity':
                     c = "relativeHumidityMeasurement"
@@ -349,17 +349,21 @@ class Location(ILocation):
     def _calc_epoch_range(self, delta_start: str, delta_end: str | None = None) -> tuple[int, int]:
         """Calculate epoch millisecond range from ISO8601 durations."""
         import isodate
+        from datetime import timedelta
 
         now = datetime.now(self.timezone)
-        start_delta = isodate.parse_duration(delta_start)
+        start_delta: timedelta = isodate.parse_duration(delta_start)
         start_time = now - start_delta
+        end_time: datetime = now
         if delta_end is not None:
-            end_delta = isodate.parse_duration(delta_end)
+            end_delta: timedelta = isodate.parse_duration(delta_end)
             end_time = now - end_delta
-        else:
-            end_time = now
 
-        return int(start_time.timestamp() * 1000), int(end_time.timestamp() * 1000)
+        # Type annotation helps the type checker understand these are datetime objects
+        start_timestamp = start_time.timestamp()  # type: ignore
+        end_timestamp = end_time.timestamp()  # type: ignore
+        
+        return int(start_timestamp * 1000), int(end_timestamp * 1000)
 
     def history(
         self,
